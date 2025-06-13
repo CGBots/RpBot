@@ -12,7 +12,7 @@ use crate::discord::connect_bot::connect_bot;
 
 #[tokio::main(flavor= "multi_thread")]
 async fn main() {
-    DB_CLIENT.connect_db().await;
+    DB_CLIENT.lock().unwrap().connect_db().await;
     let _ = connect_bot().await;
 }
 
