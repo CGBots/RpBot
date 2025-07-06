@@ -1,6 +1,7 @@
 use std::str::FromStr;
-use serde::{Deserialize, Deserializer, Serializer};
+use serde::{Deserialize, Deserializer};
 
+#[allow(dead_code)]
 fn to_u64<'de, D>(deserializer: D) -> Result<u64, D::Error> 
 where
     D: Deserializer<'de>,

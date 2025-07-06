@@ -16,22 +16,3 @@ async fn main() {
     let _ = DB_CLIENT.lock().unwrap().connect_db().await;
     let _ = connect_bot().await;
 }
-
-
-#[cfg(test)]
-mod tests {
-    use multilateration::{multilaterate, Measurement, Point};
-
-    #[test]
-    fn test_multilateration() {
-        let measurements = vec![
-            Measurement::new(Point(vec![0.0, 0.0, 1.0, 1.3]), 3.0),
-            Measurement::new(Point(vec![0.0, 3.0, 1.0, 1.2]), 3.0),
-            Measurement::new(Point(vec![3.0, 0.0, 1.0, 1.2]), 3.0),
-        ];
-
-        let coordinates = multilaterate(measurements).unwrap().0;
-        println!("Coordinates are: {:?}", coordinates);
-
-    }
-}

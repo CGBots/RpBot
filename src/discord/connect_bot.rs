@@ -1,8 +1,12 @@
+#[allow(unused_imports)]
 use std::collections::VecDeque;
-use std::{env};
-use std::sync::{Arc, Mutex};
+#[allow(unused_imports)]
 use tokio::sync::Mutex as Mut;
+#[allow(unused_imports)]
 use std::time::Duration;
+#[allow(unused_imports)]
+use std::sync::{Arc, Mutex};
+use std::{env};
 use serenity::all::GatewayIntents;
 use serenity::Client;
 use serenity::client::ClientBuilder;
@@ -31,7 +35,7 @@ pub async fn connect_bot() -> Result<Client, ()>{
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: commands,
+            commands,
             ..Default::default()
         })
         .setup(|ctx, _ready, framework| {
@@ -67,8 +71,8 @@ pub async fn connect_bot() -> Result<Client, ()>{
         });
 
         tokio::time::sleep(Duration::from_secs(3)).await; // Use async sleep
-        Err(())
-    }
+        return Err(())
+    };
 
     #[cfg(not(test))]
     {
@@ -81,7 +85,7 @@ pub async fn connect_bot() -> Result<Client, ()>{
         if let Err(why) = client.start_shards(SHARD_NUMBER).await {
             println!("Client error: {why:?}");
         }
-        Ok(client)
+        return Ok(client)
     }
 
 }

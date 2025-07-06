@@ -22,6 +22,7 @@ pub struct Translations {
 /// - `tr!(ctx, "identifier", arg1: VALUE1, arg2: VALUE2)` (with arguments)
 ///
 /// Doesn't support retrieving message attributes
+#[allow(unused_macros)]
 macro_rules! tr {
     ( $ctx:ident, $id:expr $(, $argname:ident: $argvalue:expr )* $(,)? ) => {{
         #[allow(unused_mut)]
@@ -31,6 +32,7 @@ macro_rules! tr {
         $crate::translation::get($ctx, $id, None, Some(&args))
     }};
 }
+#[allow(unused_imports)]
 pub(crate) use tr;
 
 /// Given a language file and message identifier, returns the translations

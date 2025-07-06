@@ -26,6 +26,7 @@ pub struct Universe {
 }
 
 impl Universe{
+    #[allow(dead_code)]
     pub async fn get_universe_by_server_id(server_id: u64) -> mongodb::error::Result<Cursor<Universe>> {
         let db_client = DB_CLIENT.lock().unwrap().clone();
         let filter = doc! { "server_ids": {"$in": [server_id.to_string()] } };
