@@ -17,17 +17,20 @@ pub struct Translations {
 /// - `tr!(ctx, "identifier", arg1: VALUE1, arg2: VALUE2)` (with arguments)
 ///
 /// Doesn't support retrieving message attributes
-#[allow(unused_macros)]
+/// Macro to retrieve a translation, optionally with arguments. Use like:
+/// - `tr!(ctx, "identifier")` (no arguments)
+/// - `tr!(ctx, "identifier", arg1: VALUE1, arg2: VALUE2)` (with arguments)
+///
+/// Doesn't support retrieving message attributes
 macro_rules! tr {
     ( $ctx:ident, $id:expr $(, $argname:ident: $argvalue:expr )* $(,)? ) => {{
         #[allow(unused_mut)]
         let mut args = fluent::FluentArgs::new();
         $( args.set(stringify!($argname), $argvalue); )*
 
-        $crate::translations::get($ctx, $id, None, Some(&args))
+        $crate::translation::get($ctx, $id, None, Some(&args))
     }};
 }
-#[allow(unused_imports)]
 pub(crate) use tr;
 
 /// Given a language file and message identifier, returns the translations

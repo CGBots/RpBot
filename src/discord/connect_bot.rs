@@ -7,6 +7,7 @@ use serenity::all::GatewayIntents;
 use serenity::Client;
 use serenity::client::ClientBuilder;
 use crate::{translation};
+use crate::create_universe_command::handler::create_universe;
 use crate::discord::handler::Handler;
 use crate::ping_command::handler::ping;
 use crate::discord::poise_structs::Data;
@@ -19,11 +20,11 @@ pub(crate) static TEST_PASSED: Mutex<VecDeque<bool>> = Mutex::new(VecDeque::new(
 
 pub async fn connect_bot() -> Result<Client, ()>{
     tracing_subscriber::fmt::init();
-    let mut commands= vec![ping()];
+    let mut commands= vec![ping(), create_universe()];
     let translations = translation::read_ftl().expect("failed to read translation files");
     translation::apply_translations(&translations, &mut commands);
     
-    let token = env::var("RpBotTestToken").expect("Expected a token in the environment");
+    let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT;

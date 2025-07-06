@@ -38,10 +38,13 @@ impl DbClient {
         DbClient{inner: None}
     }
 
+    /// To connect the database and create the unique client, just use the following line
+    /// `DB_CLIENT.lock().unwrap().connect_db().await.unwrap();`
+    /// DB_CLIENT should be initialised and can be accessed everywhere.
     pub async fn connect_db(&mut self) -> Result<(), mongodb::error::Error>{
-        let user = env::var("MongoDbUser").expect("Expected a database user in the environment");
+        let user = env::var("MONGODB_USER").expect("Expected a database user in the environment");
         let user = encode(&user);
-        let password = env::var("MongoDbPassword").expect("Expected a database password in the environment");
+        let password = env::var("MONGODB_PASSWORD").expect("Expected a database password in the environment");
         let password = encode(&password);
         let url = format!("mongodb://{user}:{password}@localhost:27017/?authSource=admin");
         match mongodb::Client::with_uri_str(url).await {
