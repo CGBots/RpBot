@@ -1,5 +1,5 @@
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::create_universe_command::universe::Universe;
+use crate::universe::Universe;
 use crate::database::db_client::DB_CLIENT;
 use crate::discord::poise_structs::*;
 
@@ -40,5 +40,4 @@ pub async fn create_universe(
         }
         Err(_) => {Ok(())}
     }
-    
 }

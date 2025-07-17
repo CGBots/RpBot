@@ -5,6 +5,8 @@ mod database;
 mod discord;
 mod bson_modifiers;
 mod setup_command;
+pub mod universe;
+mod add_server_to_universe_command;
 
 use discord::poise_structs::{Context, Data, Error};
 use crate::database::db_client::DB_CLIENT;
