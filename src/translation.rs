@@ -1,96 +1,88 @@
-//! Wraps the fluent API and provides easy to use functions and macros for translations
+//! Provides a translation layer using Fluent for internationalization,
+//! with automatic fallback and macro-based access for Poise commands.
 
+use std::collections::HashMap;
+use std::path::Path;
 use crate::{Context, Data, Error};
+use fluent::{FluentArgs, FluentValue};
+use fluent::bundle::FluentBundle;
+use fluent::FluentResource;
+use intl_memoizer::concurrent::IntlLangMemoizer;
+use regex::Regex;
 
-type FluentBundle = fluent::bundle::FluentBundle<
-    fluent::FluentResource,
-    intl_memoizer::concurrent::IntlLangMemoizer,
->;
+/// Type alias for a Fluent bundle with concurrent memoization
+type Bundle = FluentBundle<FluentResource, IntlLangMemoizer>;
 
+/// Holds all loaded translation bundles, including the default and locale-specific ones.
 pub struct Translations {
-    main: FluentBundle,
-    other: std::collections::HashMap<String, FluentBundle>,
+    pub main: Bundle,
+    pub other: HashMap<String, Bundle>,
 }
 
-/// Macro to retrieve a translations, optionally with arguments. Use like:
-/// - `tr!(ctx, "identifier")` (no arguments)
-/// - `tr!(ctx, "identifier", arg1: VALUE1, arg2: VALUE2)` (with arguments)
-///
-/// Doesn't support retrieving message attributes
-/// Macro to retrieve a translation, optionally with arguments. Use like:
-/// - `tr!(ctx, "identifier")` (no arguments)
-/// - `tr!(ctx, "identifier", arg1: VALUE1, arg2: VALUE2)` (with arguments)
-///
-/// Doesn't support retrieving message attributes
-#[allow(unused_macros)]
+/// Macro to retrieve a translation string, optionally with arguments.
+/// Usage:
+/// - `tr!(ctx, "identifier")`
+/// - `tr!(ctx, "identifier", arg1: VALUE1, arg2: VALUE2)`
+#[macro_export]
 macro_rules! tr {
-    ( $ctx:ident, $id:expr $(, $argname:ident: $argvalue:expr )* $(,)? ) => {{
-        #[allow(unused_mut)]
+    ( $ctx:expr, $id:expr $(, $argname:ident: $argvalue:expr )* $(,)? ) => {{
         let mut args = fluent::FluentArgs::new();
         $( args.set(stringify!($argname), $argvalue); )*
-
-        $crate::translation::get($ctx, $id, None, Some(&args))
+        $crate::translation::smart_tr($ctx, $id, Some(&args)).unwrap()
+    }};
+    ( $ctx:expr, $id:expr ) => {{
+        $crate::translation::smart_tr($ctx, $id, None).unwrap()
     }};
 }
 #[allow(unused_imports)]
 pub(crate) use tr;
 
-/// Given a language file and message identifier, returns the translations
+/// Formats a Fluent message with optional attribute and arguments.
 pub fn format(
-    bundle: &FluentBundle,
+    bundle: &Bundle,
     id: &str,
     attr: Option<&str>,
-    args: Option<&fluent::FluentArgs<'_>>,
+    args: Option<&FluentArgs<'_>>,
 ) -> Option<String> {
     let message = bundle.get_message(id)?;
     let pattern = match attr {
         Some(attribute) => message.get_attribute(attribute)?.value(),
         None => message.value()?,
     };
-    let formatted = bundle.format_pattern(pattern, args, &mut vec![]);
-    Some(formatted.into_owned())
+    Some(bundle.format_pattern(pattern, args, &mut vec![]).into_owned())
 }
 
-/// Retrieves the appropriate language file depending on user locale and calls [`format`]
-#[allow(dead_code)]
+/// Retrieves a translation string using the user's locale, falling back to the default bundle.
 pub fn get(
     ctx: Context,
     id: &str,
     attr: Option<&str>,
-    args: Option<&fluent::FluentArgs<'_>>,
+    args: Option<&FluentArgs<'_>>,
 ) -> String {
     let translations = &ctx.data().translations;
     ctx.locale()
-        // Try to get the language-specific translations
         .and_then(|locale| format(translations.other.get(locale)?, id, attr, args))
-        // Otherwise, fall back on main translations
         .or_else(|| format(&translations.main, id, attr, args))
-        // If this message ID is not present in any translations files whatsoever
         .unwrap_or_else(|| {
-            tracing::warn!("unknown fluent message identifier `{}`", id);
+            tracing::warn!("Unknown Fluent message identifier `{}`", id);
             id.to_string()
         })
 }
 
-/// Parses the `translations/` folder into a set of language files (FluentBundle)
+/// Loads all `.ftl` files from the `translations/` folder into memory.
 pub fn read_ftl() -> Result<Translations, Error> {
-    fn read_single_ftl(path: &std::path::Path) -> Result<(String, FluentBundle), Error> {
-        // Extract locale from filename
-        let locale = path.file_stem().ok_or("invalid .ftl filename")?;
-        let locale = locale.to_str().ok_or("invalid filename UTF-8")?;
+    fn read_single_ftl(path: &Path) -> Result<(String, Bundle), Error> {
+        let locale = path.file_stem()
+            .and_then(|s| s.to_str())
+            .ok_or("Invalid .ftl filename")?;
 
-        // Load .ftl resource
         let file_contents = std::fs::read_to_string(path)?;
-        let resource = fluent::FluentResource::try_new(file_contents)
-            .map_err(|(_, e)| format!("failed to parse {:?}: {:?}", path, e))?;
+        let resource = FluentResource::try_new(file_contents)
+            .map_err(|(_, e)| format!("Failed to parse {:?}: {:?}", path, e))?;
 
-        // Associate .ftl resource with locale and bundle it
-        let mut bundle = FluentBundle::new_concurrent(vec![locale
-            .parse()
-            .map_err(|e| format!("invalid locale `{}`: {}", locale, e))?]);
-        bundle
-            .add_resource(resource)
-            .map_err(|e| format!("failed to add resource to bundle: {:?}", e))?;
+        let mut bundle = Bundle::new_concurrent(vec![locale.parse()?]);
+        bundle.add_resource(resource)
+            .map_err(|e| format!("Failed to add resource to bundle: {:?}", e))?;
 
         Ok((locale.to_string(), bundle))
     }
@@ -98,89 +90,116 @@ pub fn read_ftl() -> Result<Translations, Error> {
     Ok(Translations {
         main: read_single_ftl("translations/en-US.ftl".as_ref())?.1,
         other: std::fs::read_dir("translations")?
-            .map(|file| read_single_ftl(&file?.path()))
+            .map(|entry| read_single_ftl(&entry?.path()))
             .collect::<Result<_, _>>()?,
-    }) 
+    })
 }
 
-/// Given a set of language files, fills in command strings and their localizations accordingly
+/// Applies translations to Poise command definitions, including names, descriptions, and parameters.
 pub fn apply_translations(
     translations: &Translations,
     commands: &mut [poise::Command<Data, Error>],
 ) {
-    for command in &mut *commands {
-        // Add localizations
+    for command in commands {
         for (locale, bundle) in &translations.other {
-            // Insert localized command name and description
-            let localized_command_name = match format(bundle, &command.name, None, None) {
-                Some(x) => x,
-                None => continue, // no localization entry => skip localization
-            };
-            command
-                .name_localizations
-                .insert(locale.clone(), localized_command_name);
-            command.description_localizations.insert(
-                locale.clone(),
-                format(bundle, &command.name, Some("description"), None).unwrap(),
-            );
-
-            for parameter in &mut command.parameters {
-                // Insert localized parameter name and description
-                parameter.name_localizations.insert(
+            if let Some(name) = format(bundle, &command.name, None, None) {
+                command.name_localizations.insert(locale.clone(), name);
+                command.description_localizations.insert(
                     locale.clone(),
-                    format(bundle, &command.name, Some(&parameter.name), None).unwrap(),
-                );
-                parameter.description_localizations.insert(
-                    locale.clone(),
-                    format(
-                        bundle,
-                        &command.name,
-                        Some(&format!("{}-description", parameter.name)),
-                        None,
-                    )
-                        .unwrap(),
+                    format(bundle, &command.name, Some("description"), None).unwrap(),
                 );
 
-                // If this is a choice parameter, insert its localized variants
-                for choice in &mut parameter.choices {
-                    choice.localizations.insert(
+                for param in &mut command.parameters {
+                    param.name_localizations.insert(
                         locale.clone(),
-                        format(bundle, &choice.name, None, None).unwrap(),
+                        format(bundle, &command.name, Some(&param.name), None).unwrap(),
                     );
+                    param.description_localizations.insert(
+                        locale.clone(),
+                        format(bundle, &command.name, Some(&format!("{}-description", param.name)), None).unwrap(),
+                    );
+                    for choice in &mut param.choices {
+                        choice.localizations.insert(
+                            locale.clone(),
+                            format(bundle, &choice.name, None, None).unwrap(),
+                        );
+                    }
                 }
             }
         }
 
-        // At this point, all translations files have been applied. However, if a user uses a locale
-        // we haven't explicitly inserted, there would be no translations at all -> blank texts. So,
-        // we use the "main" translations file (en-US) as the non-localized strings.
-
-        // Set fallback command name and description to en-US
+        // Fallback to main bundle
         let bundle = &translations.main;
-        match format(bundle, &command.name, None, None) {
-            Some(x) => command.name = x,
-            None => continue, // no localization entry => keep hardcoded names
-        }
-        command.description =
-            Some(format(bundle, &command.name, Some("description"), None).unwrap());
+        if let Some(name) = format(bundle, &command.name, None, None) {
+            command.name = name;
+            command.description = Some(format(bundle, &command.name, Some("description"), None).unwrap());
 
-        for parameter in &mut command.parameters {
-            // Set fallback parameter name and description to en-US
-            parameter.name = format(bundle, &command.name, Some(&parameter.name), None).unwrap();
-            parameter.description = Some(
-                format(
-                    bundle,
-                    &command.name,
-                    Some(&format!("{}-description", parameter.name)),
-                    None,
-                )
-                    .unwrap(),
-            );
+            for param in &mut command.parameters {
+                param.name = format(bundle, &command.name, Some(&param.name), None).unwrap();
+                param.description = Some(format(bundle, &command.name, Some(&format!("{}-description", param.name)), None).unwrap());
 
-            // If this is a choice parameter, set the choice names to en-US
-            for choice in &mut parameter.choices {
-                choice.name = format(bundle, &choice.name, None, None).unwrap();
+                for choice in &mut param.choices {
+                    choice.name = format(bundle, &choice.name, None, None).unwrap();
+                }
             }
         }
     }
+}
+
+/// Extracts all variable names like `{$var}` from a Fluent-formatted string.
+fn extract_variables_from_pattern(pattern: &str) -> Vec<String> {
+    Regex::new(r"\{\$(\w+)\}")
+        .unwrap()
+        .captures_iter(pattern)
+        .filter_map(|cap| cap.get(1).map(|m| m.as_str().to_string()))
+        .collect()
+}
+
+/// Retrieves a translation and automatically fills missing variables from other Fluent messages.
+/// If a variable is not passed explicitly, it will attempt to resolve it using a fallback key
+/// with the same name (e.g. `{$create_universe}` → `create_universe`).
+pub fn smart_tr(
+    ctx: Context,
+    id: &str,
+    explicit_args: Option<&FluentArgs>,
+) -> Result<String, Error> {
+    let translations = &ctx.data().translations;
+    let bundle = ctx.locale()
+        .and_then(|locale| translations.other.get(locale))
+        .unwrap_or(&translations.main);
+
+    let message = bundle.get_message(id)
+        .or_else(|| translations.main.get_message(id))
+        .ok_or_else(|| format!("Missing Fluent message for id `{}`", id))?;
+
+    let pattern = message.value()
+        .ok_or_else(|| format!("Message `{}` has no value", id))?;
+
+    let raw_text = bundle.format_pattern(pattern, None, &mut vec![]).into_owned();
+    let used_vars = extract_variables_from_pattern(&raw_text);
+
+    let mut args = FluentArgs::new();
+    if let Some(explicit) = explicit_args {
+        for (k, v) in explicit.iter() {
+            args.set(k, v.clone());
+        }
+    }
+
+    for var in used_vars {
+        if args.get(&var).is_none() {
+            let fallback_id = var.clone();
+            if let Some(value) = format(bundle, &fallback_id, None, None)
+                .or_else(|| format(&translations.main, &fallback_id, None, None))
+            {
+                args.set(var.clone(), FluentValue::from(value));
+            } else {
+                return Err(format!(
+                    "Missing variable `{var}` and fallback `{}` not found",
+                    fallback_id
+                ).into());
+            }
+        }
+    }
+
+    Ok(bundle.format_pattern(pattern, Some(&args), &mut vec![]).into_owned())
 }

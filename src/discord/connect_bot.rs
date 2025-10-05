@@ -15,6 +15,7 @@ use crate::add_server_to_universe_command::handler::add_server;
 use crate::create_universe_command::handler::create_universe;
 use crate::discord::handler::Handler;
 use crate::ping_command::handler::ping;
+use crate::start_command::handler::start;
 use crate::discord::poise_structs::Data;
 
 #[cfg(not(test))]
@@ -25,7 +26,11 @@ pub(crate) static TEST_PASSED: Mutex<VecDeque<bool>> = Mutex::new(VecDeque::new(
 
 pub async fn connect_bot() -> Result<Client, ()>{
     tracing_subscriber::fmt::init();
-    let mut commands= vec![ping(), create_universe(), add_server()];
+    
+    
+    let mut commands= vec![ping(), create_universe(), add_server(), start()];
+    
+    
     let translations = translation::read_ftl().expect("failed to read translation files");
     translation::apply_translations(&translations, &mut commands);
     
@@ -88,7 +93,6 @@ pub async fn connect_bot() -> Result<Client, ()>{
         }
         return Ok(client)
     }
-
 }
 
 #[cfg(test)]

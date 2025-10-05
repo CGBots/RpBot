@@ -1,7 +1,6 @@
 //! Module containing business logic for ping command.
 use std::time::SystemTime;
 
-
 pub struct PingCommandData{
     /// command creation timestamp in millisecond
     #[allow(dead_code)]
