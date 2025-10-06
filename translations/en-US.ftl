@@ -9,7 +9,11 @@ create_universe = create_universe
 start = start
     .description = Show startup instructions on the channel.
 
-create_universe__already_exist_for_this_server = This server is already include in a universe.
+already_exist_for_this_server = This server is already include in a universe.
+
+exceed_limit_number_of_servers_per_universe = You have reached the maximum number of servers allowed for this universe.
+    To increase the limit, please upgrade to a higher subscription plan.
+
 universes_unavailable = There are no existing universe, or there are not available.
 not-in-guild-error = Command must be invoked in a guild.
 already_bind = This guild is already bind to a universe.

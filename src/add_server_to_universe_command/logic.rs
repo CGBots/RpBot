@@ -37,7 +37,7 @@ use crate::database::universe::Universe;
 ///     Ok(universe) => println!("Guild is linked to universe: {}", universe.name),
 ///     Err(err) => println!("Error: {}", err),
 /// }
-/// ``` 
+/// ```
 pub async fn check_server_in_universe(guild_id: u64) -> Result<Universe, String>{
     if let Ok(mut cursor) = Universe::get_universe_by_server_id(guild_id).await {
         if let Some(universe) = cursor.try_next().await.unwrap() {

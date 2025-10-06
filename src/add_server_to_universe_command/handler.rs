@@ -20,11 +20,11 @@ use serenity::all::{
 /// # Command Behavior
 ///
 /// 1. The command first checks if the current guild is already linked
-///    to a universe via [`check_server_in_universe`].  
+///    to a universe via [`check_server_in_universe`].
 ///    If it is, the command responds with a localized `"already_bind"` message.
 ///
 /// 2. If not yet linked, it retrieves all universes created by the current user
-///    using [`Universe::get_creator_universes`].  
+///    using [`Universe::get_creator_universes`].
 ///    If the user owns no universes, a localized `"universes_unavailable"` message
 ///    is sent.
 ///
@@ -47,9 +47,9 @@ use serenity::all::{
 ///
 /// Returns an [`Error`] if any of the following operations fail:
 ///
-/// * Sending or editing interaction responses  
-/// * Retrieving universes from the database  
-/// * Linking the guild to a universe  
+/// * Sending or editing interaction responses
+/// * Retrieving universes from the database
+/// * Linking the guild to a universe
 ///
 /// # Permissions
 ///
