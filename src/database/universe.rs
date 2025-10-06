@@ -1,3 +1,15 @@
+//! Module defining the `Universe` model and its database interactions.
+//!
+//! A **Universe** is a container for Discord servers, metadata, and settings
+//! within the RPBot system. This module provides:
+//! - The `Universe` struct representing the database document.
+//! - CRUD methods for interacting with MongoDB.
+//! - Utility functions for retrieving universes by server or creator.
+//! - Constants defining free-tier limits.
+//! - Unit tests for insertion, deletion, and retrieval.
+//!
+//! ⚠️ Note: Most methods currently do **not** perform authorization checks.
+
 use futures::TryStreamExt;
 use crate::database::db_client::DB_CLIENT;
 use crate::database::db_namespace::{RPBOT_DB_NAME, UNIVERSE_COLLECTION_NAME};
@@ -8,7 +20,11 @@ use mongodb::results::{InsertOneResult, UpdateResult};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
+/// Maximum number of universes a creator can have in the free tier.
 pub static FREE_LIMIT_UNIVERSE: usize = 2;
+
+/// Maximum number of servers per universe in the free tier.
+pub static FREE_LIMIT_SERVERS_PER_UNIERSE: usize = 2;
 
 /// Represents a universe in the RPBot system.
 ///
@@ -37,7 +53,7 @@ pub struct Universe {
     #[serde_as(as = "DisplayFromStr")]
     pub global_time_modifier: u32,
 
-    /// Timestamp of when the universe was created (in milliseconds since epoch).
+    /// Timestamp of when the universe was created (milliseconds since epoch).
     #[serde_as(as = "DisplayFromStr")]
     pub creation_timestamp: u128,
 
@@ -46,6 +62,7 @@ pub struct Universe {
 }
 
 impl Universe {
+    /// Creates a deep clone of the current `Universe`.
     pub fn clone(&self) -> Self {
         Self {
             universe_id: self.universe_id.clone(),
@@ -60,12 +77,12 @@ impl Universe {
 }
 
 impl Universe {
-    /// Retrieves all universes that include the given server ID in their `server_ids` array.
+    /// Retrieves all universes that include the given server ID.
     ///
-    /// ⚠️ This method performs no validation or authorization checks.
+    /// ⚠️ No authorization or validation is performed.
     ///
     /// # Arguments
-    /// * `server_id` - The ID of the server to search for.
+    /// * `server_id` - Discord server ID to search for.
     ///
     /// # Returns
     /// A MongoDB cursor over matching `Universe` documents.
@@ -81,12 +98,12 @@ impl Universe {
             .await
     }
 
-    /// Inserts the current `Universe` instance into the database.
+    /// Inserts the current `Universe` instance into MongoDB.
     ///
-    /// ⚠️ This method does not check for duplicates or validate the data.
+    /// ⚠️ No duplicate checks are performed.
     ///
     /// # Returns
-    /// A MongoDB `InsertOneResult` indicating the outcome of the operation.
+    /// `InsertOneResult` indicating the insertion outcome.
     pub async fn insert_universe(&self) -> mongodb::error::Result<InsertOneResult> {
         let db_client = DB_CLIENT.lock().unwrap().clone();
         db_client
@@ -96,15 +113,15 @@ impl Universe {
             .await
     }
 
-    /// Retrieves all universes created by the specified user.
+    /// Retrieves all universes created by a specific user.
     ///
-    /// ⚠️ This method does not validate the user ID or check permissions.
+    /// ⚠️ No validation of user ID or permissions.
     ///
     /// # Arguments
-    /// * `user_id` - The creator's user ID.
+    /// * `user_id` - Creator's user ID.
     ///
     /// # Returns
-    /// A MongoDB cursor over matching `Universe` documents.
+    /// A `Vec<Universe>` of universes owned by the user.
     pub async fn get_creator_universes(user_id: u64) -> Vec<Universe> {
         let db_client = DB_CLIENT.lock().unwrap().clone();
         let filter = doc! { "creator_id": user_id.to_string() };
@@ -116,17 +133,17 @@ impl Universe {
             .unwrap().try_collect().await.unwrap()
     }
 
-    /// Adds a server ID to the `server_ids` array of this universe.
+    /// Adds a server to this universe.
     ///
-    /// Uses `$addToSet` to ensure the server ID is only added if it doesn't already exist.
+    /// Uses `$addToSet` to prevent duplicates.
     ///
-    /// ⚠️ This method does not validate the server ID or check for authorization.
+    /// ⚠️ No validation or authorization checks.
     ///
     /// # Arguments
-    /// * `server_id` - The server ID to associate with this universe.
+    /// * `server_id` - Discord server ID to add.
     ///
     /// # Returns
-    /// A MongoDB `UpdateResult` indicating the outcome of the update.
+    /// `UpdateResult` of the update operation.
     pub async fn add_server_to_universe(
         &self,
         server_id: u64,
@@ -141,18 +158,15 @@ impl Universe {
             .await
     }
 
-    /// Retrieves a universe document by its unique ID.
+    /// Retrieves a universe by its ObjectId.
     ///
-    /// ⚠️ This method does not validate the format of the ID beyond parsing.
+    /// ⚠️ Only parses string IDs; no further validation.
     ///
     /// # Arguments
-    /// * `universe_id` - A string representation of the universe's ObjectId.
+    /// * `universe_id` - String representation of ObjectId.
     ///
     /// # Returns
-    /// An `Option<Universe>` if found, or `None` if no match exists.
-    ///
-    /// # Errors
-    /// Returns a MongoDB error if the ID is invalid or the query fails.
+    /// `Option<Universe>` if found, or `None`.
     pub async fn get_universe_by_id(
         universe_id: String,
     ) -> mongodb::error::Result<Option<Universe>> {
@@ -166,12 +180,13 @@ impl Universe {
             .await
     }
 
+    /// Generates a unique database name for this universe.
     pub fn get_universe_database_name(&self) -> String{
         format!("{}_{}",self.name, self.universe_id)
     }
 }
 
-/// Unit tests for the `Universe` model and its database interactions.
+/// Unit tests for the `Universe` model.
 #[cfg(test)]
 mod test {
     use crate::database::db_client::DB_CLIENT;
