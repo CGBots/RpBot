@@ -62,21 +62,6 @@ pub struct Universe {
 }
 
 impl Universe {
-    /// Creates a deep clone of the current `Universe`.
-    pub fn clone(&self) -> Self {
-        Self {
-            universe_id: self.universe_id.clone(),
-            server_ids: self.server_ids.clone(),
-            name: self.name.clone(),
-            creator_id: self.creator_id,
-            global_time_modifier: self.global_time_modifier,
-            creation_timestamp: self.creation_timestamp,
-            default_locale: self.default_locale.clone(),
-        }
-    }
-}
-
-impl Universe {
     /// Retrieves all universes that include the given server ID.
     ///
     /// ⚠️ No authorization or validation is performed.
@@ -156,6 +141,8 @@ impl Universe {
             .collection::<Universe>(UNIVERSE_COLLECTION_NAME)
             .update_one(filter, data_to_insert)
             .await
+        
+        //TODO insérer le serveur dans la base de données de l'univers
     }
 
     /// Retrieves a universe by its ObjectId.
@@ -183,6 +170,19 @@ impl Universe {
     /// Generates a unique database name for this universe.
     pub fn get_universe_database_name(&self) -> String{
         format!("{}_{}",self.name, self.universe_id)
+    }
+
+    /// Creates a deep clone of the current `Universe`.
+    pub fn clone(&self) -> Self {
+        Self {
+            universe_id: self.universe_id.clone(),
+            server_ids: self.server_ids.clone(),
+            name: self.name.clone(),
+            creator_id: self.creator_id.clone(),
+            global_time_modifier: self.global_time_modifier.clone(),
+            creation_timestamp: self.creation_timestamp.clone(),
+            default_locale: self.default_locale.clone(),
+        }
     }
 }
 
