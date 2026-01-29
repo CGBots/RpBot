@@ -10,10 +10,10 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 use poise::CreateReply;
 use crate::create_universe_command::logic::check_universe_conditions_for_creation;
-use crate::database::universe::{Universe, FREE_LIMIT_UNIVERSE};
-use crate::database::db_client::DB_CLIENT;
+use crate::database::universe::{Universe};
 use crate::discord::poise_structs::*;
 use crate::translation::tr;
+use crate::database::server::{Server};
 
 /// Creates a new universe and binds it to the current Discord guild.
 ///
@@ -109,13 +109,18 @@ pub async fn create_universe(
     }
 
     //TODO dans un second temps
-    // proposer un déploiement partiel ou complet
-    // créer les roles et autres éléments avant d'insérer dans la base de données
+    // faire le déploiement partiel d'office
+    // proposer un déploiement complet
 
-    let db_client = DB_CLIENT.lock().unwrap().clone();
     universe.universe_id = Default::default();
     match universe.insert_universe().await{
-        Ok(result) => {
+        Ok(_) => {
+            let mut server = Server::default();
+            server.universe_id = universe.universe_id;
+            server.server_id = ctx.guild_id().unwrap().get();
+            
+            server.insert_server(universe.universe_id.to_string().as_str()).await.unwrap();
+            
             ctx.send(
                 CreateReply::default()
                     .content(tr!(ctx, "universe_created", universe_name: universe.name))

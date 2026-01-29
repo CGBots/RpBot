@@ -26,6 +26,7 @@ pub struct Translations {
 #[macro_export]
 macro_rules! tr {
     ( $ctx:expr, $id:expr $(, $argname:ident: $argvalue:expr )* $(,)? ) => {{
+        #[allow(unused_mut)]
         let mut args = fluent::FluentArgs::new();
         $( args.set(stringify!($argname), $argvalue); )*
         $crate::translation::smart_tr($ctx, $id, Some(&args)).unwrap()
@@ -53,6 +54,7 @@ pub fn format(
 }
 
 /// Retrieves a translation string using the user's locale, falling back to the default bundle.
+#[allow(unused)]
 pub fn get(
     ctx: Context,
     id: &str,

@@ -24,7 +24,7 @@ use serenity::all::{
 ///    If it is, the command responds with a localized `"already_bind"` message.
 ///
 /// 2. If not yet linked, it retrieves all universes created by the current user
-///    using [`Universe::get_creator_universes`].
+///    using [`Universe::get_universe_creator`].
 ///    If the user owns no universes, a localized `"universes_unavailable"` message
 ///    is sent.
 ///
@@ -81,7 +81,7 @@ pub async fn add_server(ctx: Context<'_>) -> Result<(), Error> {
         _ => {}
     }
 
-    let universes: Vec<Universe> = Universe::get_creator_universes(ctx.author().id.get()).await;
+    let universes: Vec<Universe> = Universe::get_universe_creator(ctx.author().id.get()).await;
 
     if universes.is_empty() {
         ctx.send(
@@ -115,7 +115,7 @@ pub async fn add_server(ctx: Context<'_>) -> Result<(), Error> {
         )
         .await?;
 
-    while let Some(mci) = ComponentInteractionCollector::new(ctx.serenity_context())
+    while let Some(mci) = ComponentInteractionCollector::new(ctx)
         .timeout(std::time::Duration::from_secs(120))
         .filter(move |mci| mci.data.custom_id == "selected_universe")
         .await

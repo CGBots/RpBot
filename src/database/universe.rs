@@ -13,7 +13,6 @@
 use futures::TryStreamExt;
 use crate::database::db_client::DB_CLIENT;
 use crate::database::db_namespace::{RPBOT_DB_NAME, UNIVERSE_COLLECTION_NAME};
-use mongodb::Cursor;
 use mongodb::bson::doc;
 use mongodb::bson::oid::ObjectId;
 use mongodb::results::{InsertOneResult, UpdateResult};
@@ -73,13 +72,13 @@ impl Universe {
     /// A MongoDB cursor over matching `Universe` documents.
     pub async fn get_universe_by_server_id(
         server_id: u64,
-    ) -> mongodb::error::Result<Cursor<Universe>> {
+    ) -> mongodb::error::Result<Option<Universe>> {
         let db_client = DB_CLIENT.lock().unwrap().clone();
         let filter = doc! { "server_ids": {"$in": [server_id.to_string()] } };
         db_client
             .database(RPBOT_DB_NAME)
             .collection::<Universe>(UNIVERSE_COLLECTION_NAME)
-            .find(filter)
+            .find_one(filter)
             .await
     }
 
@@ -107,7 +106,7 @@ impl Universe {
     ///
     /// # Returns
     /// A `Vec<Universe>` of universes owned by the user.
-    pub async fn get_creator_universes(user_id: u64) -> Vec<Universe> {
+    pub async fn get_universe_creator(user_id: u64) -> Vec<Universe> {
         let db_client = DB_CLIENT.lock().unwrap().clone();
         let filter = doc! { "creator_id": user_id.to_string() };
         db_client
@@ -168,11 +167,13 @@ impl Universe {
     }
 
     /// Generates a unique database name for this universe.
+    #[allow(unused)]
     pub fn get_universe_database_name(&self) -> String{
         format!("{}_{}",self.name, self.universe_id)
     }
 
     /// Creates a deep clone of the current `Universe`.
+    #[allow(unused)]
     pub fn clone(&self) -> Self {
         Self {
             universe_id: self.universe_id.clone(),
@@ -182,6 +183,23 @@ impl Universe {
             global_time_modifier: self.global_time_modifier.clone(),
             creation_timestamp: self.creation_timestamp.clone(),
             default_locale: self.default_locale.clone(),
+        }
+    }
+
+    //TODO documentation
+    #[allow(unused)]
+    pub async fn check_universe_ownership(server_id: u64, user_id: u64) -> Result<bool, String> {
+        let result = Self::get_universe_by_server_id(server_id).await;
+        match result {
+            Ok(cursor) => {
+                match cursor {
+                    Some(universe) => {
+                        if universe.creator_id == user_id { Ok(true) } else { Ok(false) }
+                    }
+                    None => { Err("check_universe_ownership__universe_not_found".to_string()) }
+                }
+            }
+            Err(_) => { Err("check_universe_ownership__universe_not_found".to_string()) }
         }
     }
 }
@@ -270,9 +288,10 @@ mod test {
         delete_previously_setup().await;
         match result {
             Ok(data) => {
-                println!("{:?}", data.current());
-                let universe_data = data.deserialize_current().unwrap();
-                println!("{:?}", universe_data)
+                match data{
+                    None => {assert!(false, "no universe found")}
+                    Some(universe_data) => {println!("{:?}", universe_data)}
+                }
             }
             Err(_) => {
                 assert!(false, "get data failed")
@@ -284,7 +303,7 @@ mod test {
     #[tokio::test]
     async fn test_recover_universe_by_creator_id() {
         let _ = insert_universe().await;
-        let result = Universe::get_creator_universes(0).await;
+        let result = Universe::get_universe_creator(0).await;
         delete_previously_setup().await;
         if result.is_empty(){
             println!("no universes found");
@@ -320,7 +339,7 @@ mod test {
     #[tokio::test]
     async fn test_recover_unexisting_universe_by_id() {
         let _ = insert_universe().await;
-        let result = Universe::get_creator_universes(1).await;
+        let result = Universe::get_universe_creator(1).await;
         if !result.is_empty(){
             println!("universes found {:?}", result);
             assert!(false)

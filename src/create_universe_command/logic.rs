@@ -51,7 +51,7 @@ use crate::database::universe::{Universe, FREE_LIMIT_SERVERS_PER_UNIERSE, FREE_L
 /// }
 /// ```
 pub async fn check_universe_conditions_for_creation(guild_id: GuildId, creator_id: UserId) -> Result<(), &'static str> {
-    let universes = Universe::get_creator_universes(creator_id.get()).await;
+    let universes = Universe::get_universe_creator(creator_id.get()).await;
     if universes.len() >= FREE_LIMIT_UNIVERSE {
         return Err("exceed_limit_number_of_universes")
     }

@@ -17,6 +17,7 @@ use crate::discord::handler::Handler;
 use crate::ping_command::handler::ping;
 use crate::start_command::handler::start;
 use crate::discord::poise_structs::Data;
+use crate::setup_command::handler::setup;
 
 #[cfg(not(test))]
 static SHARD_NUMBER: u32 = 1;
@@ -28,7 +29,7 @@ pub async fn connect_bot() -> Result<Client, ()>{
     tracing_subscriber::fmt::init();
     
     
-    let mut commands= vec![ping(), create_universe(), add_server(), start()];
+    let mut commands= vec![ping(), create_universe(), add_server(), start(), setup()];
     
     
     let translations = translation::read_ftl().expect("failed to read translation files");

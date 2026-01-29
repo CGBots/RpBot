@@ -5,7 +5,6 @@
 //! it to a new one. These functions interact with the database layer defined
 //! in [`crate::database::universe::Universe`].
 
-use futures::TryStreamExt;
 use crate::database::universe::Universe;
 
 /// Checks whether a Discord guild (server) is already bound to an existing universe.
@@ -39,8 +38,8 @@ use crate::database::universe::Universe;
 /// }
 /// ```
 pub async fn check_server_in_universe(guild_id: u64) -> Result<Universe, String>{
-    if let Ok(mut cursor) = Universe::get_universe_by_server_id(guild_id).await {
-        if let Some(universe) = cursor.try_next().await.unwrap() {
+    if let Ok(cursor) = Universe::get_universe_by_server_id(guild_id).await {
+        if let Some(universe) = cursor{
             return Ok(universe);
         }
     }
@@ -91,9 +90,8 @@ pub async fn add_server_to_universe(universe: String, guild_id: u64) -> Result<U
         .unwrap()
         .unwrap();
 
-    let result = universe.add_server_to_universe(guild_id)
-        .await
-        .unwrap();
+    let _result = universe.add_server_to_universe(guild_id)
+        .await;
     
     Ok(universe)
 }
