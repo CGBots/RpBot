@@ -21,15 +21,14 @@
 //    + wiki_forum_id,
 
 use log::{log, Level};
-use poise::{CreateReply, ReplyHandle};
-use serenity::all::{ButtonStyle, Channel, ChannelId, ChannelType, ComponentInteractionCollector, CreateActionRow, CreateButton, CreateEmbed, GuildId, Role, RoleId};
+use poise::{CreateReply};
+use serenity::all::{ButtonStyle, Channel, ChannelType, ComponentInteractionCollector, CreateActionRow, CreateButton, CreateEmbed, Role, RoleId};
 use serenity::model::Colour;
-use serenity::prelude::SerenityError;
 use tokio::join;
 use crate::discord::poise_structs::{Context, Error};
-use crate::discord::roles::{create_role, edit_role_positions, AdminRolePermissions, ModeratorRolePermissions, PlayerRolePermissions, SpectatorRolePermissions};
+use crate::discord::roles::{create_role, edit_role_positions, AdminRolePermissions, ModeratorRolePermissions};
 use crate::tr;
-use crate::database::server::{Id, IdType, Server};
+use crate::database::server::{Id, Server};
 use crate::database::server::IdType::{Category, Role as IdTypeRole};
 use crate::database::universe::Universe;
 use crate::discord::channels::{create_channel, get_road_category_permission_set};

@@ -55,15 +55,8 @@ use mongodb::bson::oid::ObjectId;
 use mongodb::results::{InsertOneResult, UpdateResult};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
-use serenity::all::{ChannelId, ChannelType, GuildId, PermissionOverwrite, RoleId};
-use serenity::prelude::SerenityError;
-use tracing::log::{log, Level};
 use crate::database::db_client::DB_CLIENT;
 use crate::database::db_namespace::{SERVER_COLLECTION_NAME};
-use crate::discord::channels::create_channel;
-use crate::discord::poise_structs::Context;
-use crate::discord::roles::{create_role, AdminRolePermissions};
-use crate::tr;
 
 /// Represents a server (Discord guild) document stored in MongoDB.
 ///
