@@ -79,7 +79,6 @@ pub async fn setup(ctx: Context<'_>, setup_type: SetupType) -> Result<(), Error>
 
         }
     }
-    
 
     Ok(())
 }
@@ -152,78 +151,103 @@ async fn partial_setup(ctx : Context<'_>) -> Result<&str, Vec<&str>> {
         }
     }
 
+    let mut roles_created: Vec<Role> = vec![];
+    let mut errors: Vec<&str> = vec![];
+
     //Ne récréé pas ce qui existe déjà
     let admin_role = match server.admin_role_id.id{
-        None => {create_role(ctx, tr!(ctx, "admin_role_name"), *AdminRolePermissions).await}
+        None => {
+            match create_role(ctx, tr!(ctx, "admin_role_name"), *AdminRolePermissions).await {
+                Ok(role) => {roles_created.push(role.clone()); Ok(role)}
+                Err(e) => {errors.push("setup__admin_role_not_created"); Err(e)}
+            }
+        }
         Some(role_id) => {
             match ctx.http().get_guild_role(server.server_id.into(), role_id.into()).await{
                 Ok(role) => {Ok(role)}
-                Err(_) => {create_role(ctx, tr!(ctx, "admin_role_name"), *AdminRolePermissions).await}
+                Err(_) => {
+                    match create_role(ctx, tr!(ctx, "admin_role_name"), *AdminRolePermissions).await {
+                        Ok(role) => {roles_created.push(role.clone()); Ok(role)}
+                        Err(e) => {errors.push("setup__admin_role_not_created"); Err(e)}
+                    }
+                }
             }
         }
     };
 
     let moderator_role = match server.moderator_role_id.id{
-        None => {create_role(ctx, tr!(ctx, "moderator_role_name"), *ModeratorRolePermissions).await}
+        None => {
+            match create_role(ctx, tr!(ctx, "moderator_role_name"), *ModeratorRolePermissions).await {
+                Ok(role) => {roles_created.push(role.clone()); Ok(role)}
+                Err(e) => {errors.push("setup__moderator_role_not_created"); Err(e)}
+            }
+        }
         Some(role_id) => {
             match ctx.http().get_guild_role(server.server_id.into(), role_id.into()).await{
                 Ok(role) => {Ok(role)}
-                Err(_) => {create_role(ctx, tr!(ctx, "moderator_role_name"), *ModeratorRolePermissions).await}
+                Err(_) => {
+                    match create_role(ctx, tr!(ctx, "moderator_role_name"), *AdminRolePermissions).await {
+                        Ok(role) => {roles_created.push(role.clone()); Ok(role)}
+                        Err(e) => {errors.push("setup__moderator_role_not_created"); Err(e)}
+                    }
+                }
             }
         }
     };
 
     let spectator_role = match server.spectator_role_id.id{
-        None => {create_role(ctx, tr!(ctx, "spectator_role_name"), *SpectatorRolePermissions).await}
+        None => {
+            match create_role(ctx, tr!(ctx, "spectator_role_name"), *ModeratorRolePermissions).await {
+                Ok(role) => {roles_created.push(role.clone()); Ok(role)}
+                Err(e) => {errors.push("setup__spectator_role_not_created"); Err(e)}
+            }
+        }
         Some(role_id) => {
             match ctx.http().get_guild_role(server.server_id.into(), role_id.into()).await{
                 Ok(role) => {Ok(role)}
-                Err(_) => {create_role(ctx, tr!(ctx, "spectator_role_name"), *SpectatorRolePermissions).await}
+                Err(_) => {
+                    match create_role(ctx, tr!(ctx, "spectator_role_name"), *AdminRolePermissions).await {
+                        Ok(role) => {roles_created.push(role.clone()); Ok(role)}
+                        Err(e) => {errors.push("setup__spectator_role_not_created"); Err(e)}
+                    }
+                }
             }
         }
     };
 
     let player_role = match server.player_role_id.id{
-        None => {create_role(ctx, tr!(ctx, "player_role_name"), *PlayerRolePermissions).await}
+        None => {
+            match create_role(ctx, tr!(ctx, "player_role_name"), *ModeratorRolePermissions).await {
+                Ok(role) => {roles_created.push(role.clone()); Ok(role)}
+                Err(e) => {errors.push("setup__player_role_not_created"); Err(e)}
+            }
+        }
         Some(role_id) => {
             match ctx.http().get_guild_role(server.server_id.into(), role_id.into()).await{
                 Ok(role) => {Ok(role)}
-                Err(_) => {create_role(ctx, tr!(ctx, "player_role_name"), *PlayerRolePermissions).await}
+                Err(_) => {
+                    match create_role(ctx, tr!(ctx, "player_role_name"), *AdminRolePermissions).await {
+                        Ok(role) => {roles_created.push(role.clone()); Ok(role)}
+                        Err(e) => {errors.push("setup__player_role_not_created"); Err(e)}
+                    }
+                }
             }
         }
     };
 
-    //Results verification
-    let results = [
-        ("setup__admin_role_not_created", &admin_role),
-        ("setup__moderator_role_not_created", &moderator_role),
-        ("setup__spectator_role_not_created", &spectator_role),
-        ("setup__player_role_not_created", &player_role)
-    ];
-
-    let errors: Vec<&str> = results
-        .iter()
-        .filter_map(|(name, res)| res.as_ref().err().map(|_| *name))
-        .collect();
-
     if !errors.is_empty() {
-        for result in results{
-            match result.1{
-                Ok(role) => {
-                    if !(role.id.get() == server.admin_role_id.id.unwrap_or(0) || role.id == server.moderator_role_id.id.unwrap_or(0) || role.id == server.spectator_role_id.id.unwrap_or(0) || role.id == server.player_role_id.id.unwrap_or(0)) {
-                        match role.clone().delete(ctx).await {
-                            Ok(_) => {}
-                            Err(_) => {
-                                log!(Level::Error, "Error while setuping and rollbacking.\
-                                 universe_id: {}\
-                                 server_id: {}\
-                                 role_id: {}", server.universe_id, server.server_id, role.id);
-                                return Err(vec!["setup__rollback_failed"])
-                            }
-                        }
+        for role in roles_created{
+            if !(role.id.get() == server.admin_role_id.id.unwrap_or(0) || role.id == server.moderator_role_id.id.unwrap_or(0) || role.id == server.spectator_role_id.id.unwrap_or(0) || role.id == server.player_role_id.id.unwrap_or(0)) {
+                match role.clone().delete(ctx).await {
+                    Ok(_) => {}
+                    Err(_) => {
+                        log!(Level::Error, "Error while setuping and rollbacking.\
+                         universe_id: {}\
+                         server_id: {}\
+                         role_id: {}", server.universe_id, server.server_id, role.id);
+                        return Err(vec!["setup__rollback_failed"])
                     }
                 }
-                Err(_) => {}
             }
         }
         return Err(errors)
@@ -246,20 +270,19 @@ async fn partial_setup(ctx : Context<'_>) -> Result<&str, Vec<&str>> {
 
     let roles_pos: Vec<(RoleId, Option<u64>)> = vec![(admin_role.id, Some(4)), (moderator_role.id, Some(3)), (spectator_role.id, Some(2)), (player_role.id, Some(1)), (bot_role, Some(5))];
     let res = edit_role_positions(ctx, ctx.guild_id().unwrap(), roles_pos).await; // : Result<&str, Vec<_>> = Err::<&str, Vec<&str>>(vec![])
-    let roles = vec![admin_role.clone(), moderator_role.clone(), spectator_role.clone(), player_role.clone()];
 
     match res {
         Ok(_) => {}
         Err(e) => {
             println!("{:?}", e);
-            for mut role in roles {
+            for mut role in roles_created {
                 match role.delete(ctx).await {
                     Ok(_) => {}
                     Err(_) => {
                         log!(Level::Error, "Error during setup and rollback.\
-                                 universe_id: {}\
-                                 server_id: {}\
-                                 role_id: {}", server.universe_id, server.server_id, role.id);
+                            universe_id: {}\
+                            server_id: {}\
+                            role_id: {}", server.universe_id, server.server_id, role.id);
                     }
                 };
             }
@@ -285,7 +308,7 @@ async fn partial_setup(ctx : Context<'_>) -> Result<&str, Vec<&str>> {
             match new_channel_result {
                 Ok(channel) => {Channel::Guild(channel)}
                 Err(_) => {
-                    for mut role in roles {
+                    for mut role in roles_created {
                         match role.delete(ctx).await {
                             Ok(_) => {}
                             Err(_) => {
