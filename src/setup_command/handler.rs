@@ -1,7 +1,7 @@
 //TODO
 // Vérifier que l'utilisateur est le créateur de l'univers.
 // Si l'utilisateur est bien le créateur effectuer le setup en fonction du mode choisis.
-// Mode partiel:
+// Mode partiel:  DONE
 //  . admin_role_id, DONE
 //  . moderator_role_id, DONE
 //  . spectator_role_id, DONE
