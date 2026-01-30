@@ -21,7 +21,7 @@
 //    + wiki_forum_id,
 
 use log::{log, Level};
-use poise::CreateReply;
+use poise::{CreateReply, ReplyHandle};
 use serenity::all::{ButtonStyle, Channel, ChannelId, ChannelType, ComponentInteractionCollector, CreateActionRow, CreateButton, CreateEmbed, GuildId, Role, RoleId};
 use serenity::model::Colour;
 use serenity::prelude::SerenityError;
@@ -75,8 +75,14 @@ pub async fn setup(ctx: Context<'_>, setup_type: SetupType) -> Result<(), Error>
                         .title(tr!(ctx, "setup__error_title"))
                     )
             ).reply(true);
-            ctx.send(message).await?;
-
+            let message_result = ctx.send(message).await;
+            match message_result {
+                Ok(_) => {}
+                Err(_) => {
+                    log!(Level::Error, "Error while sending error message:\
+                     {}", tr!(ctx, "setup__setup_error_message", errors: errors.as_str()));
+                }
+            }
         }
     }
 
