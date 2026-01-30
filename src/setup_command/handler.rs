@@ -237,16 +237,14 @@ async fn partial_setup(ctx : Context<'_>) -> Result<&str, Vec<&str>> {
 
     if !errors.is_empty() {
         for role in roles_created{
-            if !(role.id.get() == server.admin_role_id.id.unwrap_or(0) || role.id == server.moderator_role_id.id.unwrap_or(0) || role.id == server.spectator_role_id.id.unwrap_or(0) || role.id == server.player_role_id.id.unwrap_or(0)) {
-                match role.clone().delete(ctx).await {
-                    Ok(_) => {}
-                    Err(_) => {
-                        log!(Level::Error, "Error while setuping and rollbacking.\
-                         universe_id: {}\
-                         server_id: {}\
-                         role_id: {}", server.universe_id, server.server_id, role.id);
-                        return Err(vec!["setup__rollback_failed"])
-                    }
+            match role.clone().delete(ctx).await {
+                Ok(_) => {}
+                Err(_) => {
+                    log!(Level::Error, "Error while setuping and rollbacking.\
+                     universe_id: {}\
+                     server_id: {}\
+                     role_id: {}", server.universe_id, server.server_id, role.id);
+                    return Err(vec!["setup__rollback_failed"])
                 }
             }
         }
