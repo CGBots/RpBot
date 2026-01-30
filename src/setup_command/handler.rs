@@ -335,7 +335,6 @@ async fn partial_setup(ctx : Context<'_>) -> Result<&str, Vec<&str>> {
     match server.update().await {
         Ok(_) => {}
         Err(_) => {
-            //TODO rollback de tout
             for mut role in roles_created {
                 match role.delete(ctx).await {
                     Ok(_) => {}
