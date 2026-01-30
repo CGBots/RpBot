@@ -40,34 +40,6 @@ pub enum SetupType {
     PartialSetup
 }
 
-impl Id{
-    pub async fn rollback(&self, ctx: Context<'_>, guild_id: GuildId)-> Result<(), ()>{
-        match self.id{
-            None => {log!(Level::Warn, "No id.");
-                Ok(())
-            }
-            Some(id) => {
-                let guild = ctx.guild().unwrap();
-
-                let result: Result<(), SerenityError> = match self.id_type.as_ref().unwrap(){
-                    IdType::Role => {guild.delete_role(ctx, RoleId::new(id)).await}
-                    IdType::Channel => {ctx.http().delete_channel(ChannelId::new(id), Some("Rollback")).await.map(|_| ())}
-                    IdType::Category => {ctx.http().delete_channel(ChannelId::new(id), Some("Rollback")).await.map(|_| ())}
-                };
-
-                match result {
-                    Ok(_) => {Ok(())}
-                    Err(_) => {log!(Level::Error, "Error removing: {:?}", self.id_type.as_ref().unwrap());
-                        //TODO erreur en cas de rollback échoué
-                        Err(())
-                    }
-                }
-            }
-        }
-    }
-}
-
-
 #[poise::command(slash_command, required_permissions = "ADMINISTRATOR", guild_only)]
 pub async fn setup(ctx: Context<'_>, setup_type: SetupType) -> Result<(), Error> {
     ctx.defer().await.unwrap();
@@ -112,7 +84,6 @@ pub async fn setup(ctx: Context<'_>, setup_type: SetupType) -> Result<(), Error>
     Ok(())
 }
 
-//TODO revert en cas d'erreur
 async fn partial_setup(ctx : Context<'_>) -> Result<&str, Vec<&str>> {
     
     //everyone role
@@ -137,8 +108,6 @@ async fn partial_setup(ctx : Context<'_>) -> Result<&str, Vec<&str>> {
     let mut server = if server.is_err() || server.clone().unwrap().is_none(){
         return Err(vec!["setup__server_not_found"]) }
         else {server.unwrap().unwrap()};
-
-    //TODO revoir ce morceau
 
     if server.admin_role_id.id.is_some()
         || server.moderator_role_id.id.is_some()
@@ -238,16 +207,33 @@ async fn partial_setup(ctx : Context<'_>) -> Result<&str, Vec<&str>> {
         .collect();
 
     if !errors.is_empty() {
-        //TODO rollback des roles ici + message selon si le rollback fonctionne ou pas.
+        for result in results{
+            match result.1{
+                Ok(role) => {
+                    if !(role.id.get() == server.admin_role_id.id.unwrap_or(0) || role.id == server.moderator_role_id.id.unwrap_or(0) || role.id == server.spectator_role_id.id.unwrap_or(0) || role.id == server.player_role_id.id.unwrap_or(0)) {
+                        match role.clone().delete(ctx).await {
+                            Ok(_) => {}
+                            Err(_) => {
+                                log!(Level::Error, "Error while setuping and rollbacking.\
+                                 universe_id: {}\
+                                 server_id: {}\
+                                 role_id: {}", server.universe_id, server.server_id, role.id);
+                                return Err(vec!["setup__rollback_failed"])
+                            }
+                        }
+                    }
+                }
+                Err(_) => {}
+            }
+        }
         return Err(errors)
     }
 
-
     //Unwrapping
-    let admin_role = admin_role.unwrap().id;
-    let moderator_role = moderator_role.unwrap().id;
-    let spectator_role = spectator_role.unwrap().id;
-    let player_role = player_role.unwrap().id;
+    let admin_role = admin_role.unwrap();
+    let moderator_role = moderator_role.unwrap();
+    let spectator_role = spectator_role.unwrap();
+    let player_role = player_role.unwrap();
     let everyone_role = everyone_role;
     
     //Reordering roles
@@ -258,18 +244,29 @@ async fn partial_setup(ctx : Context<'_>) -> Result<&str, Vec<&str>> {
         .await.unwrap();
     let bot_role = bot_member.roles.clone()[0];
 
-    let roles_pos: Vec<(RoleId, Option<u64>)> = vec![(admin_role, Some(4)), (moderator_role, Some(3)), (spectator_role, Some(2)), (player_role, Some(1)), (bot_role, Some(5))];
-    let res = edit_role_positions(ctx, ctx.guild_id().unwrap(), roles_pos).await;
+    let roles_pos: Vec<(RoleId, Option<u64>)> = vec![(admin_role.id, Some(4)), (moderator_role.id, Some(3)), (spectator_role.id, Some(2)), (player_role.id, Some(1)), (bot_role, Some(5))];
+    let res = edit_role_positions(ctx, ctx.guild_id().unwrap(), roles_pos).await; // : Result<&str, Vec<_>> = Err::<&str, Vec<&str>>(vec![])
+    let roles = vec![admin_role.clone(), moderator_role.clone(), spectator_role.clone(), player_role.clone()];
 
     match res {
         Ok(_) => {}
         Err(e) => {
             println!("{:?}", e);
-            //TODO Rollback
+            for mut role in roles {
+                match role.delete(ctx).await {
+                    Ok(_) => {}
+                    Err(_) => {
+                        log!(Level::Error, "Error during setup and rollback.\
+                                 universe_id: {}\
+                                 server_id: {}\
+                                 role_id: {}", server.universe_id, server.server_id, role.id);
+                    }
+                };
+            }
             return Err(vec!["setup__reorder_went_wrong"])}
     }
 
-    let permissions = get_road_category_permission_set(everyone_role, player_role, spectator_role, moderator_role);
+    let permissions = get_road_category_permission_set(everyone_role, player_role.id, spectator_role.id, moderator_role.id);
 
     let result_road_category = match server.road_category_id.id{
         None => {Err(create_channel(ctx, tr!(ctx, "road_channel_name"), ChannelType::Category, 0, permissions, None).await)}
@@ -288,16 +285,26 @@ async fn partial_setup(ctx : Context<'_>) -> Result<&str, Vec<&str>> {
             match new_channel_result {
                 Ok(channel) => {Channel::Guild(channel)}
                 Err(_) => {
-                    //TODO rollback des rôles en cas d'échec
+                    for mut role in roles {
+                        match role.delete(ctx).await {
+                            Ok(_) => {}
+                            Err(_) => {
+                                log!(Level::Error, "Error during setup and rollback.\
+                                 universe_id: {}\
+                                 server_id: {}\
+                                 role_id: {}", server.universe_id, server.server_id, role.id);
+                            }
+                        };
+                    }
                     return Err(vec!["setup__road_category_not_created"]); }
             }
         }
     };
     
-    server.admin_role_id = Id{ id: Some(admin_role.get()), id_type: Some(IdTypeRole) };
-    server.moderator_role_id = Id{ id: Some(moderator_role.get()), id_type: Some(IdTypeRole) };
-    server.spectator_role_id = Id{ id: Some(spectator_role.get()), id_type: Some(IdTypeRole) };
-    server.player_role_id = Id{ id: Some(player_role.get()), id_type: Some(IdTypeRole) };
+    server.admin_role_id = Id{ id: Some(admin_role.id.get()), id_type: Some(IdTypeRole) };
+    server.moderator_role_id = Id{ id: Some(moderator_role.id.get()), id_type: Some(IdTypeRole) };
+    server.spectator_role_id = Id{ id: Some(spectator_role.id.get()), id_type: Some(IdTypeRole) };
+    server.player_role_id = Id{ id: Some(player_role.id.get()), id_type: Some(IdTypeRole) };
     server.everyone_role_id = Id{ id: Some(everyone_role.get()), id_type: Some(IdTypeRole) };
     server.road_category_id = Id{ id: Some(road_category.id().get()), id_type: Some(Category) };
 
