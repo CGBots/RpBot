@@ -235,6 +235,7 @@ async fn partial_setup(ctx : Context<'_>) -> Result<&str, Vec<&str>> {
         }
     };
 
+    //verification que les rôles ont bien été créés
     if !errors.is_empty() {
         for role in roles_created{
             match role.clone().delete(ctx).await {
@@ -267,7 +268,7 @@ async fn partial_setup(ctx : Context<'_>) -> Result<&str, Vec<&str>> {
     let bot_role = bot_member.roles.clone()[0];
 
     let roles_pos: Vec<(RoleId, Option<u64>)> = vec![(admin_role.id, Some(4)), (moderator_role.id, Some(3)), (spectator_role.id, Some(2)), (player_role.id, Some(1)), (bot_role, Some(5))];
-    let res = edit_role_positions(ctx, ctx.guild_id().unwrap(), roles_pos).await; // : Result<&str, Vec<_>> = Err::<&str, Vec<&str>>(vec![])
+    let res = edit_role_positions(ctx, ctx.guild_id().unwrap(), roles_pos).await;
 
     match res {
         Ok(_) => {}
@@ -293,18 +294,20 @@ async fn partial_setup(ctx : Context<'_>) -> Result<&str, Vec<&str>> {
         None => {Err(create_channel(ctx, tr!(ctx, "road_channel_name"), ChannelType::Category, 0, permissions, None).await)}
         Some(channel_id) => {
             match ctx.http().get_channel(channel_id.into()).await{
-                Ok(role) => {Ok(role)}
+                Ok(channel) => {Ok(channel)}
                 Err(_) => {
                     Err(create_channel(ctx, tr!(ctx, "road_channel_name"), ChannelType::Category, 0, permissions, None).await)}
             }
         }
     };
 
+    let mut road_created = false;
+
     let road_category = match result_road_category {
         Ok(channel) => {channel}
         Err(new_channel_result) => {
             match new_channel_result {
-                Ok(channel) => {Channel::Guild(channel)}
+                Ok(channel) => {road_created = true; Channel::Guild(channel)}
                 Err(_) => {
                     for mut role in roles_created {
                         match role.delete(ctx).await {
@@ -333,6 +336,29 @@ async fn partial_setup(ctx : Context<'_>) -> Result<&str, Vec<&str>> {
         Ok(_) => {}
         Err(_) => {
             //TODO rollback de tout
+            for mut role in roles_created {
+                match role.delete(ctx).await {
+                    Ok(_) => {}
+                    Err(_) => {
+                        log!(Level::Error, "Error during setup and rollback.\
+                            universe_id: {}\
+                            server_id: {}\
+                            role_id: {}", server.universe_id, server.server_id, role.id);
+                    }
+                };
+            }
+            if road_created{
+                match road_category.delete(ctx).await {
+                    Ok(_) => {}
+                    Err(_) => {
+                        log!(Level::Error, "Error during setup and rollback.\
+                            universe_id: {}\
+                            server_id: {}\
+                            category_id: {}", server.universe_id, server.server_id, road_category.id());
+                    }
+                };
+            }
+
             return Err(vec!["setup__server_update_failed"])}
     };
 
