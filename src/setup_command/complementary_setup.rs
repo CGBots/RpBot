@@ -1,3 +1,12 @@
+//! Complementary setup module for Discord server configuration.
+//!
+//! This module handles the creation and configuration of Discord categories and channels
+//! required for the bot's roleplay functionality. It manages the setup of administrative,
+//! non-roleplay (NRP), and roleplay (RP) categories along with their associated channels.
+//!
+//! The setup process is idempotent and includes automatic rollback on failure to maintain
+//! server consistency.
+
 use log::{log, Level};
 use serenity::all::{ChannelType, GuildChannel, Role};
 use crate::database::server::{Id, IdType, Server};
@@ -5,12 +14,86 @@ use crate::discord::channels::{create_channel, get_admin_category_permission_set
 use crate::discord::poise_structs::Context;
 use crate::tr;
 
+/// Performs complementary setup for a Discord server by creating required categories and channels.
+///
+/// This function creates or verifies the existence of the following Discord server structure:
+///
+/// # Categories Created
+/// - **Admin Category**: Contains administrative channels with restricted permissions
+/// - **NRP Category**: Contains non-roleplay channels for general discussion
+/// - **RP Category**: Contains roleplay-specific channels
+///
+/// # Channels Created
+/// - **Log Channel**: For bot logging (in Admin category)
+/// - **Commands Channel**: For bot commands (in Admin category)
+/// - **Moderation Channel**: For moderation activities (in Admin category)
+/// - **NRP General Channel**: General discussion (in NRP category)
+/// - **RP Character Channel**: Character sheets with special permissions (in RP category)
+/// - **Wiki Channel**: Forum-type channel for RP documentation (in RP category)
+///
+/// # Arguments
+///
+/// * `ctx` - The Discord context containing HTTP client and guild information
+/// * `server` - Mutable reference to the server database object that will be updated with created channel/category IDs
+///
+/// # Returns
+///
+/// * `Ok((&'a str, Vec<Role>, Vec<GuildChannel>))` - Success message key and empty vectors on successful setup
+/// * `Err(Vec<&'a str>)` - Vector of error message keys if setup fails
+///
+/// # Behavior
+///
+/// The function follows this process:
+/// 1. Creates or verifies categories (admin, nrp, rp)
+/// 2. Creates or verifies channels within those categories
+/// 3. Updates the server database object with new IDs
+/// 4. Reorders channels to maintain consistent structure
+/// 5. Persists changes to the database
+///
+/// If any step fails, the function performs automatic rollback by deleting all created resources.
+///
+/// # Errors
+///
+/// Returns error keys for:
+/// - `setup__admin_category_not_created`: Failed to create admin category
+/// - `setup__nrp_category_not_created`: Failed to create NRP category
+/// - `setup__rp_category_not_created`: Failed to create RP category
+/// - `setup__log_channel_not_created`: Failed to create log channel
+/// - `setup__commands_channel_not_created`: Failed to create commands channel
+/// - `setup__moderation_channel_not_created`: Failed to create moderation channel
+/// - `setup__nrp_general_channel_not_created`: Failed to create NRP general channel
+/// - `setup__rp_character_channel_not_created`: Failed to create character channel
+/// - `setup__wiki_channel_not_created`: Failed to create wiki channel
+/// - `setup__server_update_failed`: Failed to update database after successful creation
+/// - `setup__rollback_failed`: Failed to rollback changes (critical error)
+///
+/// # Example
+///
+/// ```ignore
+/// let result = complementary_setup(ctx, &mut server).await;
+/// match result {
+///     Ok((message_key, _, _)) => println!("Setup successful: {}", message_key),
+///     Err(errors) => eprintln!("Setup failed with errors: {:?}", errors),
+/// }
+/// ```
+///
+/// # Notes
+///
+/// - The function is idempotent: existing channels are reused if they exist
+/// - All created resources are tracked for potential rollback
+/// - Channel reordering may fail silently without affecting overall success
+/// - Requires appropriate bot permissions (Administrator recommended)
 pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) -> Result<(&'a str, Vec<Role>, Vec<GuildChannel>), Vec<&'a str>> {
     let mut created_categories: Vec<GuildChannel> = vec![];
     let mut errors: Vec<&str> = vec![];
 
 
     //Créer les catégories: admin, nrp, rp
+    // Category creation follows an idempotent pattern:
+    // 1. Check if category ID exists in database
+    // 2. If exists, try to fetch from Discord (may have been manually deleted)
+    // 3. If fetch fails or ID is None, create new category
+    // 4. Track newly created categories for potential rollback
     let admin_category_permissions = get_admin_category_permission_set(server.everyone_role_id.id.unwrap().into(), server.spectator_role_id.id.unwrap().into(), server.player_role_id.id.unwrap().into(), server.moderator_role_id.id.unwrap().into());
     let admin_category_result = match server.admin_category_id.id{
         None => {
@@ -72,6 +155,9 @@ pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) 
         }
     };
 
+    // If any category creation failed, rollback all newly created categories
+    // to maintain server consistency. Only categories added to created_categories
+    // vector (i.e., newly created, not pre-existing) are deleted.
     if !errors.is_empty() {
         for channel in created_categories{
             match channel.clone().delete(ctx).await {
@@ -95,6 +181,11 @@ pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) 
     let mut created_channels = vec![];
     let mut errors = vec![];
 
+    // Channel creation follows the same idempotent pattern as categories:
+    // - Check database for existing ID
+    // - Verify channel still exists on Discord
+    // - Create if missing, passing parent category ID to nest the channel
+    // - Track all channels (new and existing) for potential rollback
     let log_channel_result = match server.log_channel_id.id{
         None => {
             let result = create_channel(ctx, tr!(ctx, "log_channel_name"), ChannelType::Text, 0, vec![], Some(admin_category.clone().id.get())).await;
@@ -230,6 +321,9 @@ pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) 
         }
     };
 
+    // If any channel creation failed, rollback all tracked channels.
+    // Note: This includes both newly created and pre-existing channels from the
+    // created_channels vector, ensuring complete cleanup on failure.
     if !errors.is_empty() {
         for channel in created_channels{
             match channel.clone().delete(ctx).await {
@@ -265,6 +359,11 @@ pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) 
     server.rp_character_channel_id = Id{id: Some(rp_character_channel.id.get()), id_type: Some(IdType::Channel)};
     server.rp_wiki_channel_id = Id{id: Some(wiki_channel.id.get()), id_type: Some(IdType::Channel)};
 
+    // Reorder categories to maintain consistent structure:
+    // Position 0-3: Our managed categories (admin, nrp, rp, road)
+    // Position 4+: All other existing channels/categories in the guild
+    // This ensures our categories appear at the top while preserving
+    // any user-created channels below them.
     let mut channel_order = vec![(admin_category.id, 0), (nrp_category.id, 1), (rp_category.id, 2), (server.road_category_id.id.unwrap().into(), 3)];
     let channels = ctx.guild_id().unwrap().channels(ctx).await.unwrap();
 
@@ -289,6 +388,10 @@ pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) 
         Err(_) => {}
     }
 
+    // Persist all channel/category IDs to database. On failure, perform complete
+    // rollback of both channels and categories to prevent orphaned Discord resources.
+    // This ensures atomicity: either everything succeeds and is saved, or everything
+    // is rolled back and the server state remains unchanged.
     match server.update().await {
         Ok(_) => {}
         Err(_) => {
@@ -320,5 +423,4 @@ pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) 
     };
 
     Ok(("setup__setup_success_message", vec![], vec![]))
-    //Err((vec!["placeholder"], created_categories))
 }

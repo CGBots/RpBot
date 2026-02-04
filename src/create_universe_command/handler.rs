@@ -62,12 +62,6 @@ use crate::database::server::{Server};
 /// This command requires the `ADMINISTRATOR` permission and is only
 /// executable within guilds.
 ///
-/// # TODO
-///
-/// - Add an optional deployment step to configure roles and other
-///   Discord elements before inserting the universe into the database.
-/// - Replace `.unwrap()` calls with proper error handling.
-///
 /// # Example
 ///
 /// ```ignore

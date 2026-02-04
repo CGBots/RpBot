@@ -186,7 +186,6 @@ impl Universe {
         }
     }
 
-    //TODO documentation
     #[allow(unused)]
     pub async fn check_universe_ownership(server_id: u64, user_id: u64) -> Result<bool, String> {
         let result = Self::get_universe_by_server_id(server_id).await;
