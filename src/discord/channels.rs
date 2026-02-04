@@ -27,8 +27,7 @@ pub fn get_road_category_permission_set(everyone_role_id: RoleId, player_role_id
     ]
 }
 
-#[allow(unused)]
-pub fn get_moderation_category_permission_set(everyone_role_id: RoleId, spectator_role_id: RoleId, player_role_id: RoleId) -> Vec<PermissionOverwrite>{
+pub fn get_admin_category_permission_set(everyone_role_id: RoleId, spectator_role_id: RoleId, player_role_id: RoleId, moderator_role_id: RoleId) -> Vec<PermissionOverwrite>{
     vec ! [
         PermissionOverwrite{
             allow: Permissions::default(),
@@ -44,10 +43,24 @@ pub fn get_moderation_category_permission_set(everyone_role_id: RoleId, spectato
             allow: Permissions::default(),
             deny: Permissions::VIEW_CHANNEL,
             kind: PermissionOverwriteType::Role(player_role_id)
+        },
+        PermissionOverwrite{
+            allow: Permissions::VIEW_CHANNEL,
+            deny: Permissions::default(),
+            kind: PermissionOverwriteType::Role(moderator_role_id)
         }
     ]
 }
 
+pub fn get_rp_character_permission_set(player_role_id: RoleId) -> Vec<PermissionOverwrite>{
+    vec ! [
+        PermissionOverwrite{
+            allow: Permissions::default(),
+            deny: Permissions::VIEW_CHANNEL,
+            kind: PermissionOverwriteType::Role(player_role_id)
+        }
+    ]
+}
 
 //TODO
 // Documentation

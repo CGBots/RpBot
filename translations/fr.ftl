@@ -1,3 +1,5 @@
+placeholder = Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla eget neque arcu. Integer sed turpis.
+
 support = contact.cgbots@gmail.com
 
 ping = ping
@@ -22,7 +24,24 @@ player_role_name = Joueur
 road_channel_name = Routes
 
 
-
+admin_category_name = Administration
+setup__admin_category_not_created = La catégorie {$admin_category_name} n'as pas pu être créé.
+nrp_category_name = Hors RP
+setup__nrp_category_not_created = La catégorie {$nrp_category_name} n'as pas pu être créé.
+rp_category_name = RolePlay
+setup__rp_category_not_created = La catégorie {$rp_category_name} n'as pas pu être créé.
+log_channel_name = Logs
+setup__log_channel_not_created = Le salon {$log_channel_name} n'as pas pu être créé.
+commands_channel_name = Commandes
+setup__commands_channel_not_created = Le salon {$commands_channel_name} n'as pas pu être créé.
+moderation_channel_name = Moderation
+setup__moderation_channel_not_created = Le salon {$moderation_channel_name} n'as pas pu être créé.
+nrp_general_channel_name = General
+setup__nrp_general_channel_not_created = Le salon {$nrp_general_channel_name} n'as pas pu être créé.
+rp_character_channel_name = Fiches personnage
+setup__rp_character_channel_not_created = Le salon {$rp_character_channel_name} n'as pas pu être créé.
+rp_wiki_channel_name = Wiki
+setup__wiki_channel_not_created = Le salon {$rp_wiki_channel_name} n'as pas pu être créé.
 
 
 setup = setup
@@ -55,7 +74,7 @@ setup__setup_error_message = Les erreurs suivantes ont été détectés :
     {$errors}
 
     Merci de vérifier les droits du bot. Il doit être administrateur.
-setup__error_title = Erreur a l'initialisation du serveur.
+setup__setup_error_title = Erreur a l'initialisation du serveur.
 
 
 

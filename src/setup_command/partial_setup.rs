@@ -1,81 +1,16 @@
 use log::{log, Level};
-use poise::CreateReply;
-use serenity::all::{ButtonStyle, Channel, ChannelType, ComponentInteractionCollector, CreateActionRow, CreateButton, Role, RoleId};
+use serenity::all::{ChannelType, GuildChannel, Role, RoleId};
 use crate::database::server::{Id, Server};
 use crate::database::server::IdType::Category;
-use crate::database::universe::Universe;
 use crate::discord::channels::{create_channel, get_road_category_permission_set};
 use crate::discord::poise_structs::Context;
-use crate::discord::roles::{create_role, edit_role_positions, AdminRolePermissions, ModeratorRolePermissions};
+use crate::discord::roles::{create_role, edit_role_positions, AdminRolePermissions, ModeratorRolePermissions, PlayerRolePermissions, SpectatorRolePermissions};
 use crate::tr;
 
-pub async fn partial_setup(ctx : Context<'_>) -> Result<(&str, Vec<Role>, Vec<Channel>), Vec<&str>> {
+pub async fn partial_setup<'a>(ctx : Context<'_>, server: &mut Server) -> Result<(&'a str, Vec<Role>, Vec<GuildChannel>), Vec<&'a str>> {
 
     //everyone role
-    let guild_id = ctx.guild_id().unwrap();
     let everyone_role = ctx.guild_id().unwrap().everyone_role();
-
-    //server
-    let universe_result = Universe::get_universe_by_server_id(guild_id.get()).await;
-
-    let universe_id = match universe_result {
-        Ok(cursor) => {
-            match cursor{
-                None => {return Err(vec!["setup__universe_not_found"])}
-                Some(universe) => {universe.universe_id.to_string()}
-            }
-        }
-        Err(_) => {return Err(vec!["setup__universe_not_found"])}
-    };
-
-    let server = Server::get_server_by_id(universe_id, guild_id.get().to_string()).await;
-
-    let mut server = if server.is_err() || server.clone().unwrap().is_none(){
-        return Err(vec!["setup__server_not_found"]) }
-    else {server.unwrap().unwrap()};
-
-    if server.admin_role_id.id.is_some()
-        || server.moderator_role_id.id.is_some()
-        || server.spectator_role_id.id.is_some()
-        || server.player_role_id.id.is_some()
-        || server.road_category_id.id.is_some() {
-
-        let reply = {
-            let components = vec![CreateActionRow::Buttons(vec![
-                CreateButton::new("cancel")
-                    .style(ButtonStyle::Primary)
-                    .label(tr!(ctx, "cancel_setup")),
-                CreateButton::new("continue")
-                    .style(ButtonStyle::Danger)
-                    .label(tr!(ctx, "continue_setup")),
-            ])];
-
-            CreateReply::default()
-                .content(tr!(ctx, "continue_setup_message"))
-                .components(components)
-        };
-
-        let message = ctx.send(reply).await.unwrap();
-
-        let interaction = ComponentInteractionCollector::new(ctx)
-            .author_id(ctx.author().id)
-            .channel_id(ctx.channel_id())
-            .timeout(std::time::Duration::from_secs(60))
-            .await;
-        match interaction {
-            None => {
-                message.delete(ctx).await.unwrap();
-                return Err(vec!["setup__server_already_setup_timeout"])}
-            Some(mci) => {
-                message.delete(ctx).await.unwrap();
-                let interaction_button_id = mci.data.custom_id.as_str();
-                match interaction_button_id {
-                    "cancel" => {return Ok(("setup__canceled", vec![], vec![]))}
-                    _ => {}
-                }
-            }
-        }
-    }
 
     let mut roles_created: Vec<Role> = vec![];
     let mut errors: Vec<&str> = vec![];
@@ -112,7 +47,7 @@ pub async fn partial_setup(ctx : Context<'_>) -> Result<(&str, Vec<Role>, Vec<Ch
             match ctx.http().get_guild_role(server.server_id.into(), role_id.into()).await{
                 Ok(role) => {Ok(role)}
                 Err(_) => {
-                    match create_role(ctx, tr!(ctx, "moderator_role_name"), *AdminRolePermissions).await {
+                    match create_role(ctx, tr!(ctx, "moderator_role_name"), *ModeratorRolePermissions).await {
                         Ok(role) => {roles_created.push(role.clone()); Ok(role)}
                         Err(e) => {errors.push("setup__moderator_role_not_created"); Err(e)}
                     }
@@ -123,7 +58,7 @@ pub async fn partial_setup(ctx : Context<'_>) -> Result<(&str, Vec<Role>, Vec<Ch
 
     let spectator_role = match server.spectator_role_id.id{
         None => {
-            match create_role(ctx, tr!(ctx, "spectator_role_name"), *ModeratorRolePermissions).await {
+            match create_role(ctx, tr!(ctx, "spectator_role_name"), *SpectatorRolePermissions).await {
                 Ok(role) => {roles_created.push(role.clone()); Ok(role)}
                 Err(e) => {errors.push("setup__spectator_role_not_created"); Err(e)}
             }
@@ -132,7 +67,7 @@ pub async fn partial_setup(ctx : Context<'_>) -> Result<(&str, Vec<Role>, Vec<Ch
             match ctx.http().get_guild_role(server.server_id.into(), role_id.into()).await{
                 Ok(role) => {Ok(role)}
                 Err(_) => {
-                    match create_role(ctx, tr!(ctx, "spectator_role_name"), *AdminRolePermissions).await {
+                    match create_role(ctx, tr!(ctx, "spectator_role_name"), *SpectatorRolePermissions).await {
                         Ok(role) => {roles_created.push(role.clone()); Ok(role)}
                         Err(e) => {errors.push("setup__spectator_role_not_created"); Err(e)}
                     }
@@ -143,7 +78,7 @@ pub async fn partial_setup(ctx : Context<'_>) -> Result<(&str, Vec<Role>, Vec<Ch
 
     let player_role = match server.player_role_id.id{
         None => {
-            match create_role(ctx, tr!(ctx, "player_role_name"), *ModeratorRolePermissions).await {
+            match create_role(ctx, tr!(ctx, "player_role_name"), *PlayerRolePermissions).await {
                 Ok(role) => {roles_created.push(role.clone()); Ok(role)}
                 Err(e) => {errors.push("setup__player_role_not_created"); Err(e)}
             }
@@ -152,7 +87,7 @@ pub async fn partial_setup(ctx : Context<'_>) -> Result<(&str, Vec<Role>, Vec<Ch
             match ctx.http().get_guild_role(server.server_id.into(), role_id.into()).await{
                 Ok(role) => {Ok(role)}
                 Err(_) => {
-                    match create_role(ctx, tr!(ctx, "player_role_name"), *AdminRolePermissions).await {
+                    match create_role(ctx, tr!(ctx, "player_role_name"), *PlayerRolePermissions).await {
                         Ok(role) => {roles_created.push(role.clone()); Ok(role)}
                         Err(e) => {errors.push("setup__player_role_not_created"); Err(e)}
                     }
@@ -230,10 +165,10 @@ pub async fn partial_setup(ctx : Context<'_>) -> Result<(&str, Vec<Role>, Vec<Ch
     let mut road_created = false;
 
     let road_category = match result_road_category {
-        Ok(channel) => {channel}
+        Ok(channel) => {channel.guild().unwrap()}
         Err(new_channel_result) => {
             match new_channel_result {
-                Ok(channel) => {road_created = true; Channel::Guild(channel)}
+                Ok(channel) => {road_created = true; channel}
                 Err(_) => {
                     for mut role in roles_created {
                         match role.delete(ctx).await {
@@ -256,7 +191,7 @@ pub async fn partial_setup(ctx : Context<'_>) -> Result<(&str, Vec<Role>, Vec<Ch
     server.spectator_role_id = Id{ id: Some(spectator_role.id.get()), id_type: Some(crate::database::server::IdType::Role) };
     server.player_role_id = Id{ id: Some(player_role.id.get()), id_type: Some(crate::database::server::IdType::Role) };
     server.everyone_role_id = Id{ id: Some(everyone_role.get()), id_type: Some(crate::database::server::IdType::Role) };
-    server.road_category_id = Id{ id: Some(road_category.id().get()), id_type: Some(Category) };
+    server.road_category_id = Id{ id: Some(road_category.id.get()), id_type: Some(Category) };
 
     match server.update().await {
         Ok(_) => {}
@@ -279,7 +214,7 @@ pub async fn partial_setup(ctx : Context<'_>) -> Result<(&str, Vec<Role>, Vec<Ch
                         log!(Level::Error, "Error during setup and rollback.\
                             universe_id: {}\
                             server_id: {}\
-                            category_id: {}", server.universe_id, server.server_id, road_category.id());
+                            category_id: {}", server.universe_id, server.server_id, road_category.id.get());
                     }
                 };
             }

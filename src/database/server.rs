@@ -101,9 +101,20 @@ pub struct Server {
 
     pub road_category_id: Id,
 
-    pub index_forum_id: Id,
+    pub rp_wiki_channel_id: Id,
 
     pub character_channel_id: Id,
+
+    pub log_channel_id: Id,
+
+    pub moderation_channel_id: Id,
+
+    pub commands_channel_id: Id,
+
+    pub nrp_general_channel_id: Id,
+
+    pub rp_character_channel_id: Id,
+
 }
 
 impl Server {
@@ -125,8 +136,13 @@ impl Server {
             nrp_category_id: self.nrp_category_id.clone(),
             rp_category_id: self.rp_category_id.clone(),
             road_category_id: self.road_category_id.clone(),
-            index_forum_id: self.index_forum_id.clone(),
+            rp_wiki_channel_id: self.rp_wiki_channel_id.clone(),
             character_channel_id: self.character_channel_id.clone(),
+            log_channel_id: self.log_channel_id.clone(),
+            moderation_channel_id: self.moderation_channel_id.clone(),
+            commands_channel_id: self.commands_channel_id.clone(),
+            nrp_general_channel_id: self.nrp_general_channel_id.clone(),
+            rp_character_channel_id: self.rp_character_channel_id.clone(),
         }
     }
 
@@ -256,8 +272,13 @@ mod test {
             nrp_category_id: Id::default(),
             rp_category_id: Id::default(),
             road_category_id: Id::default(),
-            index_forum_id: Id::default(),
+            rp_wiki_channel_id: Id::default(),
             character_channel_id: Id::default(),
+            log_channel_id: Id::default(),
+            moderation_channel_id: Id::default(),
+            commands_channel_id: Id::default(),
+            nrp_general_channel_id: Id::default(),
+            rp_character_channel_id: Id::default(),
         }
             .insert_server("test")
             .await;

@@ -1,3 +1,5 @@
+placeholder = Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla eget neque arcu. Integer sed turpis.
+
 support = contact.cgbots@gmail.com
 
 ping = ping
@@ -10,6 +12,10 @@ create_universe = create_universe
 
 start = start
     .description = Show startup instructions on the channel.
+
+
+
+
 admin_role_name = Admin
 moderator_role_name = Moderator
 spectator_role_name = Spectator
@@ -18,7 +24,24 @@ player_role_name = Player
 road_channel_name = Roads
 
 
-
+admin_category_name = Administration
+setup__admin_category_not_created = The category {$admin_category_name} could not be created.
+nrp_category_name =  Non-RP
+setup__nrp_category_not_created = The category {$nrp_category_name} could not be created.
+rp_category_name = RolePlay
+setup__rp_category_not_created = The category {$rp_category_name} could not be created.
+log_channel_name = Logs
+setup__log_channel_not_created = The channel {$log_channel_name} could not be created.
+commands_channel_name = Commands
+setup__commands_channel_not_created = The channel {$commands_channel_name} could not be created.
+moderation_channel_name = Moderation
+setup__moderation_channel_not_created = The channel {$moderation_channel_name} could not be created.
+nrp_general_channel_name = General
+setup__nrp_general_channel_not_created = The channel {$nrp_general_channel_name} could not be created.
+rp_character_channel_name = Character Sheets
+setup__rp_character_channel_not_created = The channel {$rp_character_channel_name} could not be created.
+rp_wiki_channel_name = Wiki
+setup__wiki_channel_not_created = The channel {$rp_wiki_channel_name} could not be created.
 
 
 setup = setup
@@ -50,7 +73,7 @@ setup__setup_error_message = The following errors have been detected:
     {$errors}
 
     Please verify the bot's rights. It should be Administrator.
-setup__error_title = Server setup error.
+setup__setup_error_title = Server setup error.
 
 
 
