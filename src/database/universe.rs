@@ -11,7 +11,7 @@
 //! ⚠️ Note: Most methods currently do **not** perform authorization checks.
 
 use futures::TryStreamExt;
-use crate::database::db_client::DB_CLIENT;
+use crate::database::db_client::{DB_CLIENT, connect_db};
 use crate::database::db_namespace::{RPBOT_DB_NAME, UNIVERSE_COLLECTION_NAME};
 use mongodb::bson::doc;
 use mongodb::bson::oid::ObjectId;
@@ -23,7 +23,7 @@ use serde_with::{DisplayFromStr, serde_as};
 pub static FREE_LIMIT_UNIVERSE: usize = 2;
 
 /// Maximum number of servers per universe in the free tier.
-pub static FREE_LIMIT_SERVERS_PER_UNIERSE: usize = 2;
+pub static FREE_LIMIT_SERVERS_PER_UNIVERSE: usize = 2;
 
 /// Represents a universe in the RPBot system.
 ///
@@ -73,7 +73,7 @@ impl Universe {
     pub async fn get_universe_by_server_id(
         server_id: u64,
     ) -> mongodb::error::Result<Option<Universe>> {
-        let db_client = DB_CLIENT.lock().unwrap().clone();
+        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         let filter = doc! { "server_ids": {"$in": [server_id.to_string()] } };
         db_client
             .database(RPBOT_DB_NAME)
@@ -89,7 +89,7 @@ impl Universe {
     /// # Returns
     /// `InsertOneResult` indicating the insertion outcome.
     pub async fn insert_universe(&self) -> mongodb::error::Result<InsertOneResult> {
-        let db_client = DB_CLIENT.lock().unwrap().clone();
+        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         db_client
             .database(RPBOT_DB_NAME)
             .collection::<Universe>(UNIVERSE_COLLECTION_NAME)
@@ -107,7 +107,7 @@ impl Universe {
     /// # Returns
     /// A `Vec<Universe>` of universes owned by the user.
     pub async fn get_universe_creator(user_id: u64) -> Vec<Universe> {
-        let db_client = DB_CLIENT.lock().unwrap().clone();
+        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         let filter = doc! { "creator_id": user_id.to_string() };
         db_client
             .database(RPBOT_DB_NAME)
@@ -132,7 +132,7 @@ impl Universe {
         &self,
         server_id: u64,
     ) -> mongodb::error::Result<UpdateResult> {
-        let db_client = DB_CLIENT.lock().unwrap().clone();
+        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         let filter = doc! { "_id": self.universe_id };
         let data_to_insert = doc! {"$addToSet": { "server_ids": server_id.to_string()}};
         db_client
@@ -156,7 +156,7 @@ impl Universe {
     pub async fn get_universe_by_id(
         universe_id: String,
     ) -> mongodb::error::Result<Option<Universe>> {
-        let db_client = DB_CLIENT.lock().unwrap().clone();
+        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         let object_id = ObjectId::parse_str(&universe_id).map_err(|e| println!("{}", e));
         let filter = doc! { "_id": object_id.unwrap() };
         db_client
@@ -206,7 +206,7 @@ impl Universe {
 /// Unit tests for the `Universe` model.
 #[cfg(test)]
 mod test {
-    use crate::database::db_client::DB_CLIENT;
+    use crate::database::db_client::{connect_db, DB_CLIENT};
     use crate::database::db_namespace::{RPBOT_DB_NAME, UNIVERSE_COLLECTION_NAME};
     use crate::database::universe::Universe;
     use mongodb::bson::doc;
@@ -219,7 +219,7 @@ mod test {
     ///
     /// Returns the result of the insertion, or an error string if it fails.
     async fn insert_universe() -> Result<InsertOneResult, String> {
-        DB_CLIENT.lock().unwrap().connect_db().await.unwrap();
+        let _ = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await;
         let universe = Universe {
             universe_id: Default::default(),
             server_ids: vec![SERVER_ID],
@@ -245,7 +245,7 @@ mod test {
     ///
     /// Used for cleanup after each test.
     async fn delete_previously_setup() -> DeleteResult {
-        let db_client = DB_CLIENT.lock().unwrap().clone();
+        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         let filter = doc! { "server_ids": {"$in": [SERVER_ID.to_string()] } };
         db_client
             .database(RPBOT_DB_NAME)

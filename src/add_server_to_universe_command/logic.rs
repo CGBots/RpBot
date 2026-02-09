@@ -5,6 +5,7 @@
 //! it to a new one. These functions interact with the database layer defined
 //! in [`crate::database::universe::Universe`].
 
+use crate::database::server::Server;
 use crate::database::universe::Universe;
 
 /// Checks whether a Discord guild (server) is already bound to an existing universe.
@@ -50,6 +51,7 @@ pub async fn check_server_in_universe(guild_id: u64) -> Result<Universe, String>
 ///
 /// This function fetches the [`Universe`] identified by the provided `universe` ID,
 /// and then updates it to include the given `guild_id` as a linked server.
+/// It also creates a corresponding [`Server`] document in the universe-specific database.
 ///
 /// # Arguments
 ///
@@ -92,6 +94,11 @@ pub async fn add_server_to_universe(universe: String, guild_id: u64) -> Result<U
 
     let _result = universe.add_server_to_universe(guild_id)
         .await;
+
+    let mut server = Server::default();
+    server.universe_id = universe.universe_id;
+    server.server_id = guild_id;
+    server.insert_server(universe.universe_id.to_string().as_str()).await.unwrap();
     
     Ok(universe)
 }

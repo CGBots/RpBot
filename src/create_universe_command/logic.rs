@@ -6,7 +6,7 @@
 //! invalid or duplicate universe creation requests.
 
 use serenity::all::{GuildId, UserId};
-use crate::database::universe::{Universe, FREE_LIMIT_SERVERS_PER_UNIERSE, FREE_LIMIT_UNIVERSE};
+use crate::database::universe::{Universe, FREE_LIMIT_SERVERS_PER_UNIVERSE, FREE_LIMIT_UNIVERSE};
 
 /// Validates whether a user and guild can create a new universe.
 ///
@@ -17,7 +17,7 @@ use crate::database::universe::{Universe, FREE_LIMIT_SERVERS_PER_UNIERSE, FREE_L
 ///
 /// These limits are defined by the constants:
 /// - [`FREE_LIMIT_UNIVERSE`]: maximum universes per creator.
-/// - [`FREE_LIMIT_SERVERS_PER_UNIERSE`]: maximum servers per universe.
+/// - [`FREE_LIMIT_SERVERS_PER_UNIVERSE`]: maximum servers per universe.
 ///
 /// # Arguments
 ///
@@ -61,7 +61,7 @@ pub async fn check_universe_conditions_for_creation(guild_id: GuildId, creator_i
             return Err("already_exist_for_this_server")
         }
         
-        if universe.server_ids.len() >= FREE_LIMIT_SERVERS_PER_UNIERSE {
+        if universe.server_ids.len() >= FREE_LIMIT_SERVERS_PER_UNIVERSE {
             return Err("exceed_limit_number_of_servers_per_universe")
         }
     }

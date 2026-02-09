@@ -55,7 +55,7 @@ use mongodb::bson::oid::ObjectId;
 use mongodb::results::{InsertOneResult, UpdateResult};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
-use crate::database::db_client::DB_CLIENT;
+use crate::database::db_client::{DB_CLIENT, connect_db};
 use crate::database::db_namespace::{SERVER_COLLECTION_NAME};
 
 /// Represents a server (Discord guild) document stored in MongoDB.
@@ -164,7 +164,7 @@ impl Server {
     /// insert request to the specified database. Any MongoDB error is returned
     /// to the caller.
     pub async fn insert_server(&self, universe_db_name: &str) -> mongodb::error::Result<InsertOneResult> {
-        let db_client = DB_CLIENT.lock().unwrap().clone();
+        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         db_client
             .database(universe_db_name)
             .collection::<Server>(SERVER_COLLECTION_NAME)
@@ -193,7 +193,7 @@ impl Server {
         universe_id: String,
         server_id: String,
     ) -> mongodb::error::Result<Option<Server>> {
-        let db_client = DB_CLIENT.lock().unwrap().clone();
+        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         let filter = doc! { "server_id": server_id };
         db_client
             .database(universe_id.as_str())
@@ -210,7 +210,7 @@ impl Server {
         let filter = doc! {"_id": &self._id};
         let update = doc! {"$set": doc};
 
-        let db_client = DB_CLIENT.lock().unwrap().clone();
+        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         db_client
             .database(self.universe_id.to_string().as_str())
             .collection::<Server>(SERVER_COLLECTION_NAME)
@@ -234,7 +234,7 @@ mod test {
 
     /// Helper inserting a Universe document required by server tests.
     async fn insert_universe() -> Result<InsertOneResult, String> {
-        DB_CLIENT.lock().unwrap().connect_db().await.unwrap();
+        let _ = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await;
         let universe = Universe {
             universe_id: *UNIVERSE_ID,
             server_ids: vec![SERVER_ID],

@@ -73,6 +73,8 @@ pub async fn partial_setup<'a>(ctx : Context<'_>, server: &mut Server) -> Result
 
     //everyone role
     let everyone_role = ctx.guild_id().unwrap().everyone_role();
+    
+    let existing_roles : Vec<Role> = ctx.http().get_guild_roles(ctx.guild_id().unwrap()).await.unwrap();
 
     let mut roles_created: Vec<Role> = vec![];
     let mut errors: Vec<&str> = vec![];
@@ -84,7 +86,7 @@ pub async fn partial_setup<'a>(ctx : Context<'_>, server: &mut Server) -> Result
     // This ensures idempotency - we don't recreate resources that already exist.
     let admin_role = match server.admin_role_id.id{
         None => {
-            match create_role(ctx, tr!(ctx, "admin_role_name"), *AdminRolePermissions).await {
+                match create_role(ctx, tr!(ctx, "admin_role_name"), *AdminRolePermissions).await {
                 Ok(role) => {roles_created.push(role.clone()); Ok(role)}
                 Err(e) => {errors.push("setup__admin_role_not_created"); Err(e)}
             }
@@ -193,8 +195,19 @@ pub async fn partial_setup<'a>(ctx : Context<'_>, server: &mut Server) -> Result
         .member(ctx.http(), bot_id)
         .await.unwrap();
     let bot_role = bot_member.roles.clone()[0];
+    
+    
+    
 
-    let roles_pos: Vec<(RoleId, Option<u64>)> = vec![(admin_role.id, Some(4)), (moderator_role.id, Some(3)), (spectator_role.id, Some(2)), (player_role.id, Some(1)), (bot_role, Some(5))];
+    let mut roles_pos: Vec<(RoleId, Option<u64>)> = vec![(admin_role.id, Some(4)), (moderator_role.id, Some(3)), (spectator_role.id, Some(2)), (player_role.id, Some(1)), (bot_role, Some(5))];
+    
+    // Add existing roles with higher positions to roles_pos without changing their positions
+    for role in &existing_roles {
+        if role.id != everyone_role {
+            roles_pos.push((role.id, Some((role.position + existing_roles.len() as u16).into())));
+        }
+    }
+    
     let res = edit_role_positions(ctx, ctx.guild_id().unwrap(), roles_pos).await;
 
     match res {

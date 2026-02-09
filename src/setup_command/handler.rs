@@ -29,7 +29,7 @@ use crate::setup_command::partial_setup::partial_setup;
 /// The type of setup to perform on the Discord server.
 ///
 /// This enum defines two configuration modes for server setup.
-#[derive(Debug, poise::ChoiceParameter)]
+#[derive(Debug, poise::ChoiceParameter, Clone, Copy)]
 pub enum SetupType {
     /// Creates all roles, categories, and channels including admin tools,
     /// character sheets, wiki, and moderation channels.
@@ -72,8 +72,15 @@ pub enum SetupType {
 /// # Permissions
 ///
 /// Requires `ADMINISTRATOR` permission and must be used in a guild context.
+///
+///
 #[poise::command(slash_command, required_permissions = "ADMINISTRATOR", guild_only)]
 pub async fn setup(ctx: Context<'_>, setup_type: SetupType) -> Result<(), Error> {
+    _setup(ctx, setup_type).await.map_err(|e| e.into())
+}
+
+
+pub async fn _setup(ctx: Context<'_>, setup_type: SetupType) -> Result<(), Error> {
     ctx.defer().await.unwrap();
 
 

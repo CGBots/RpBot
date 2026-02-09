@@ -2,6 +2,7 @@
 //! with automatic fallback and macro-based access for Poise commands.
 
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::path::Path;
 use crate::{Context, Data, Error};
 use fluent::{FluentArgs, FluentValue};
@@ -97,34 +98,32 @@ pub fn read_ftl() -> Result<Translations, Error> {
     })
 }
 
-/// Applies translations to Poise command definitions, including names, descriptions, and parameters.
+/// Applies translations to Poise command definitions, including names, descriptions, parameters, and subcommands.
 pub fn apply_translations(
     translations: &Translations,
     commands: &mut [poise::Command<Data, Error>],
 ) {
     for command in commands {
+        let original_name = command.name.clone();
+
         for (locale, bundle) in &translations.other {
-            if let Some(name) = format(bundle, &command.name, None, None) {
+            if let Some(name) = format(bundle, &original_name, None, None) {
                 command.name_localizations.insert(locale.clone(), name);
-                command.description_localizations.insert(
-                    locale.clone(),
-                    format(bundle, &command.name, Some("description"), None).unwrap(),
-                );
+                if let Some(desc) = format(bundle, &original_name, Some("description"), None) {
+                    command.description_localizations.insert(locale.clone(), desc);
+                }
 
                 for param in &mut command.parameters {
-                    param.name_localizations.insert(
-                        locale.clone(),
-                        format(bundle, &command.name, Some(&param.name), None).unwrap(),
-                    );
-                    param.description_localizations.insert(
-                        locale.clone(),
-                        format(bundle, &command.name, Some(&format!("{}-description", param.name)), None).unwrap(),
-                    );
+                    if let Some(p_name) = format(bundle, &original_name, Some(&param.name), None) {
+                        param.name_localizations.insert(locale.clone(), p_name);
+                    }
+                    if let Some(p_desc) = format(bundle, &original_name, Some(&format!("{}-description", param.name)), None) {
+                        param.description_localizations.insert(locale.clone(), p_desc);
+                    }
                     for choice in &mut param.choices {
-                        choice.localizations.insert(
-                            locale.clone(),
-                            format(bundle, &choice.name, None, None).unwrap(),
-                        );
+                        if let Some(c_name) = format(bundle, &choice.name, None, None) {
+                            choice.localizations.insert(locale.clone(), c_name);
+                        }
                     }
                 }
             }
@@ -132,18 +131,32 @@ pub fn apply_translations(
 
         // Fallback to main bundle
         let bundle = &translations.main;
-        if let Some(name) = format(bundle, &command.name, None, None) {
+        if let Some(name) = format(bundle, &original_name, None, None) {
             command.name = name;
-            command.description = Some(format(bundle, &command.name, Some("description"), None).unwrap());
+            if let Some(desc) = format(bundle, &original_name, Some("description"), None) {
+                command.description = Some(desc);
+            }
 
             for param in &mut command.parameters {
-                param.name = format(bundle, &command.name, Some(&param.name), None).unwrap();
-                param.description = Some(format(bundle, &command.name, Some(&format!("{}-description", param.name)), None).unwrap());
+                let original_param_name = param.name.clone();
+                if let Some(p_name) = format(bundle, &original_name, Some(&original_param_name), None) {
+                    param.name = p_name;
+                }
+                if let Some(p_desc) = format(bundle, &original_name, Some(&format!("{}-description", original_param_name)), None) {
+                    param.description = Some(p_desc);
+                }
 
                 for choice in &mut param.choices {
-                    choice.name = format(bundle, &choice.name, None, None).unwrap();
+                    if let Some(c_name) = format(bundle, &choice.name, None, None) {
+                        choice.name = c_name;
+                    }
                 }
             }
+        }
+
+        // Recursively apply to subcommands
+        if !command.subcommands.is_empty() {
+            apply_translations(translations, &mut command.subcommands);
         }
     }
 }

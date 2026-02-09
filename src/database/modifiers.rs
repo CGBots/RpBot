@@ -23,7 +23,7 @@ impl StatValue {
 #[derive(Clone, Debug)]
 pub struct Stat {
     pub name: String,
-    pub value: StatValue,
+    pub base_value: StatValue,
     pub formula: Option<String>,
     pub min: Option<StatValue>,
     pub max: Option<StatValue>,
@@ -33,12 +33,12 @@ pub struct Stat {
 impl Stat {
     pub fn is_within_bounds(&self) -> bool {
         if let Some(min) = &self.min {
-            if self.value < *min {
+            if self.base_value < *min {
                 return false;
             }
         }
         if let Some(max) = &self.max {
-            if self.value > *max {
+            if self.base_value > *max {
                 return false;
             }
         }
@@ -48,8 +48,10 @@ impl Stat {
 
 #[derive(Clone, Debug)]
 struct Modifier{
+    priority: i32,
     stat: ObjectId,
     variable_name: String,
     value: StatValue,
-    end_timestamp: u64,
+    formula: String,
+    end_timestamp: Option<u64>,
 }

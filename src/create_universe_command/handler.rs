@@ -7,13 +7,15 @@
 //!
 //! The command is designed to be used by administrators only and must be executed
 //! within a guild context (not in DMs).
+use crate::add_server_to_universe_command::handler::add_server;
 use std::time::{SystemTime, UNIX_EPOCH};
 use poise::CreateReply;
 use crate::create_universe_command::logic::check_universe_conditions_for_creation;
 use crate::database::universe::{Universe};
 use crate::discord::poise_structs::*;
-use crate::translation::tr;
+use crate::tr;
 use crate::database::server::{Server};
+use crate::setup_command::handler::{setup, SetupType, _setup};
 
 /// Creates a new universe and binds it to the current Discord guild.
 ///
@@ -71,10 +73,17 @@ use crate::database::server::{Server};
 /// Responds with a confirmation message:
 ///
 /// > ✅ Universe **MyFirstUniverse** has been successfully created!
+
+#[poise::command(slash_command, subcommands("create_universe", "add_server", "setup"), subcommand_required)]
+pub async fn universe(ctx: Context<'_>) -> Result<(), Error>{
+    Ok(())
+}
+
 #[poise::command(slash_command, required_permissions= "ADMINISTRATOR", guild_only)]
 pub async fn create_universe(
     ctx: Context<'_>,
     universe_name: String,
+    setup_type: SetupType
 ) -> Result<(), Error> {
     ctx.defer().await.unwrap();
     
@@ -102,6 +111,8 @@ pub async fn create_universe(
         }
     }
 
+    let result = setup();
+
     //TODO dans un second temps
     // faire le déploiement partiel d'office
     // proposer un déploiement complet
@@ -119,9 +130,9 @@ pub async fn create_universe(
                 CreateReply::default()
                     .content(tr!(ctx, "universe_created", universe_name: universe.name))
             ).await.unwrap();
-
-            Ok(())
         }
-        Err(_) => {Ok(())}
-    }
+        Err(_) => {}
+    };
+
+    _setup(ctx, setup_type).await
 }

@@ -1,6 +1,6 @@
 use crate::add_server_to_universe_command::logic::{add_server_to_universe, check_server_in_universe};
 use crate::discord::poise_structs::{Context, Error};
-use crate::translation::tr;
+use crate::tr;
 use crate::database::universe::Universe;
 use poise::CreateReply;
 use serenity::all::CreateSelectMenu;
@@ -10,6 +10,7 @@ use serenity::all::{
     ComponentInteractionCollector, ComponentInteractionDataKind, CreateActionRow,
     EditInteractionResponse,
 };
+use crate::setup_command::handler::{setup, SetupType, _setup};
 
 /// Links the current Discord server (guild) to one of the universes created by the user.
 ///
@@ -65,7 +66,7 @@ use serenity::all::{
 /// The user is prompted with a menu listing all universes they own.
 /// Selecting one will link the current guild to that universe.
 #[poise::command(slash_command, required_permissions = "ADMINISTRATOR", guild_only)]
-pub async fn add_server(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn add_server(ctx: Context<'_>, setup_type: SetupType) -> Result<(), Error> {
     ctx.defer().await.unwrap();
 
     match check_server_in_universe(ctx.guild_id().unwrap().get()).await {
@@ -122,16 +123,14 @@ pub async fn add_server(ctx: Context<'_>) -> Result<(), Error> {
     {
         if let ComponentInteractionDataKind::StringSelect { values } = &mci.data.kind {
             if let Some(selected) = values.get(0) {
-                message.delete(ctx).await.unwrap_or_default();
-                mci.defer_ephemeral(ctx.http()).await.unwrap_or_default();
+                message.delete(ctx).await;
                 let universe = add_server_to_universe(selected.clone(), ctx.guild_id().unwrap().get()).await?;
-                mci.edit_response(
-                    ctx.http(),
-                    EditInteractionResponse::new()
-                        .content(tr!(ctx, "guild_linked", universe_name: universe.name)),
-                )
-                .await
-                .unwrap();
+                _setup(ctx, setup_type).await.unwrap();
+                mci.create_response(ctx.http(), serenity::all::CreateInteractionResponse::UpdateMessage(
+                    serenity::all::CreateInteractionResponseMessage::new()
+                        .content(tr!(ctx, "guild_linked", universe_name: universe.name))
+                        .components(vec![])
+                )).await?;
             }
         }
     }
