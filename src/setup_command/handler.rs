@@ -15,16 +15,14 @@
 //! # Permissions
 //!
 //! This command requires `ADMINISTRATOR` permissions and can only be used in guilds.
-use log::{log, Level};
 use poise::{CreateReply};
-use serenity::all::{ButtonStyle, ComponentInteractionCollector, CreateActionRow, CreateButton, CreateEmbed};
-use serenity::model::Colour;
+use serenity::all::{ButtonStyle, Color, ComponentInteractionCollector, CreateActionRow, CreateButton, CreateEmbed};
 use crate::database::server::Server;
-use crate::database::universe::Universe;
 use crate::discord::poise_structs::{Context, Error};
 use crate::tr;
 use crate::setup_command::full_setup::full_setup;
 use crate::setup_command::partial_setup::partial_setup;
+use crate::utility::reply::reply;
 
 /// The type of setup to perform on the Discord server.
 ///
@@ -74,81 +72,36 @@ pub enum SetupType {
 /// Requires `ADMINISTRATOR` permission and must be used in a guild context.
 ///
 ///
+// ... existing code ...
 #[poise::command(slash_command, required_permissions = "ADMINISTRATOR", guild_only)]
 pub async fn setup(ctx: Context<'_>, setup_type: SetupType) -> Result<(), Error> {
-    _setup(ctx, setup_type).await.map_err(|e| e.into())
+    ctx.defer().await?;
+    let result = _setup(&ctx, setup_type).await;
+    reply(ctx, result).await?;
+    Ok(())
 }
 
-
-pub async fn _setup(ctx: Context<'_>, setup_type: SetupType) -> Result<(), Error> {
-    ctx.defer().await.unwrap();
-
+pub async fn _setup(ctx: &Context<'_>, setup_type: SetupType) -> Result<&'static str, Error> {
 
     let guild_id = ctx.guild_id().unwrap();
-    let universe_result = Universe::get_universe_by_server_id(guild_id.get()).await;
 
-    // Retrieve the universe ID associated with this Discord server.
-    // This uses nested match statements to handle both database errors and the case where
-    // no universe is found. Both scenarios result in the same error message to the user,
-    // but they represent different failure modes: database connectivity issues vs. missing data.
-    let universe_id = match universe_result {
-        Ok(cursor) => {
-            match cursor{
-                None => {
-                    let message = ctx.reply_builder(
-                        CreateReply::default()
-                            .embed(CreateEmbed::new()
-                                .color(Colour::from_rgb(0, 255, 0))
-                                .description(tr!(ctx, "setup__universe_not_found"))
-                                .title(tr!(ctx, "setup__setup_error_title")))
-                    ).reply(true);
-                    ctx.send(message).await?; return Ok(())}
-                Some(universe) => {universe.universe_id.to_string()}
-            }
-        }
-        Err(_) => {
-            let message = ctx.reply_builder(
-            CreateReply::default()
-                .embed(CreateEmbed::new()
-                    .color(Colour::from_rgb(0, 255, 0))
-                    .description(tr!(ctx, "setup__universe_not_found"))
-                    .title(tr!(ctx, "setup__setup_error_title")))
-        ).reply(true);
-            ctx.send(message).await?; return Ok(())}
-    };
-
-    let server = Server::get_server_by_id(universe_id, guild_id.get().to_string()).await;
-
-    // Retrieve the server configuration from the database.
-    // Uses chained error checking: first checks if the query failed, then checks if the
-    // result is None. The double unwrap() is safe here because we've verified both conditions.
-    // This pattern ensures the server exists before proceeding with setup operations.
-    let mut server = if server.is_err() || server.clone().unwrap().is_none(){
-        let message = ctx.reply_builder(
-            CreateReply::default()
-                .embed(CreateEmbed::new()
-                    .color(Colour::from_rgb(0, 255, 0))
-                    .description(tr!(ctx, "setup__server_not_found"))
-                    .title(tr!(ctx, "setup__setup_error_title")))
-        ).reply(true);
-        ctx.send(message).await?; return Ok(())
-    }
-    else {server.unwrap().unwrap()};
+    let Some(mut server) = Server::get_server_by_id(guild_id.get().to_string()).await? else {return Err("setup__server_not_found".into())};
+    let server_snapshot = server.clone().snaphot(ctx).await;
 
     // Check if any server configuration already exists by testing all possible fields.
     // This comprehensive check detects partial setups where only some roles/channels were created.
     // If any field is populated, we need user confirmation before proceeding, as the setup
     // process will attempt to create missing elements and may overwrite existing configuration.
-    if server.admin_role_id.id.is_some()
-        || server.moderator_role_id.id.is_some()
-        || server.spectator_role_id.id.is_some()
-        || server.player_role_id.id.is_some()
-        || server.road_category_id.id.is_some()
-        || server.rp_wiki_channel_id.id.is_some()
-        || server.admin_category_id.id.is_some()
-        || server.character_channel_id.id.is_some()
-        || server.nrp_category_id.id.is_some()
-        || server.rp_category_id.id.is_some(){
+    if server.admin_role_id.is_some()
+        || server.moderator_role_id.is_some()
+        || server.spectator_role_id.is_some()
+        || server.player_role_id.is_some()
+        || server.road_category_id.is_some()
+        || server.rp_wiki_channel_id.is_some()
+        || server.admin_category_id.is_some()
+        || server.nrp_category_id.is_some()
+        || server.rp_category_id.is_some()
+        || server.rp_character_channel_id.is_some() {
 
         // Present an interactive confirmation dialog with Cancel/Continue buttons.
         // The ComponentInteractionCollector waits up to 60 seconds for the user to respond.
@@ -158,101 +111,58 @@ pub async fn _setup(ctx: Context<'_>, setup_type: SetupType) -> Result<(), Error
             let components = vec![CreateActionRow::Buttons(vec![
                 CreateButton::new("cancel")
                     .style(ButtonStyle::Primary)
-                    .label(tr!(ctx, "cancel_setup")),
+                    .label(tr!(*ctx, "cancel_setup")),
                 CreateButton::new("continue")
                     .style(ButtonStyle::Danger)
-                    .label(tr!(ctx, "continue_setup")),
+                    .label(tr!(*ctx, "continue_setup")),
             ])];
 
             CreateReply::default()
-                .content(tr!(ctx, "continue_setup_message"))
+                .embed(
+                    CreateEmbed::new()
+                        .color(Color::from_rgb(0xff, 0x98, 0))
+                        .title(crate::translation::get(*ctx, &"setup__continue_setup_message", Some("title"), None))
+                        .description(crate::translation::get(*ctx, &"setup__continue_setup_message", Some("message"), None))
+                )
                 .components(components)
         };
 
-        let message = ctx.send(reply).await.unwrap();
+        let message = ctx.send(reply.clone()).await.unwrap();
 
-        let interaction = ComponentInteractionCollector::new(ctx)
+        let serenity_context = ctx.serenity_context();
+
+        let interaction = ComponentInteractionCollector::new(&serenity_context)
             .author_id(ctx.author().id)
             .channel_id(ctx.channel_id())
             .timeout(std::time::Duration::from_secs(60))
             .await;
         match interaction {
             None => {
-                message.delete(ctx).await.unwrap();
-                let message = ctx.reply_builder(
-                    CreateReply::default()
-                        .embed(CreateEmbed::new()
-                            .color(Colour::from_rgb(0, 255, 0))
-                            .description(tr!(ctx, "setup__server_already_setup_timeout"))
-                            .title(tr!(ctx, "setup__setup_error_title")))
-                ).reply(true);
-                ctx.send(message).await?; return Ok(())
-            }
+                message.delete(*ctx).await?;
+                return Err("setup__server_already_setup_timeout".into()); }
             Some(mci) => {
-                message.delete(ctx).await.unwrap();
-                let interaction_button_id = mci.data.custom_id.as_str();
-                match interaction_button_id {
+                mci.defer(ctx).await?;
+                message.edit(*ctx, reply.components(vec!())).await?;
+                match mci.data.custom_id.as_str() {
                     "cancel" => {
-                        let message = ctx.reply_builder(
-                            CreateReply::default()
-                                .embed(CreateEmbed::new()
-                                    .color(Colour::from_rgb(0, 255, 0))
-                                    .description(tr!(ctx, "setup__canceled"))
-                                    .title(tr!(ctx, "setup__setup_success_title")))
-                        ).reply(true);
-                        ctx.send(message).await?; return Ok(())
+                        message.delete(*ctx).await?;
+                        return Ok("setup_server__cancelled");
                     }
                     _ => {}
-                }
+                };
             }
-        }
+        };
     }
-    
+
     let result = match setup_type {
-        SetupType::FullSetup => { full_setup(ctx, &mut server).await }
-        SetupType::PartialSetup => { partial_setup(ctx, &mut server).await }
+        SetupType::FullSetup => { full_setup(ctx, &mut server, server_snapshot).await }
+        SetupType::PartialSetup => { partial_setup(ctx, &mut server, server_snapshot).await }
     };
 
-    match result{
-        Ok(result) => {
-            let message = ctx.reply_builder(
-                CreateReply::default()
-                    .embed(CreateEmbed::new()
-                        .color(Colour::from_rgb(0, 255, 0))
-                        .description(tr!(ctx, result.0))
-                        .title(tr!(ctx, "setup__setup_success_title")))
-            ).reply(true);
-            ctx.send(message).await?;
-        }
-        Err(err) => {
-            // Format error messages for display by prepending arrow characters and translating.
-            // Each error key is translated to the user's language, then prefixed with "► " for
-            // visual hierarchy. The resulting strings are joined with newlines to create a
-            // bulleted list that's embedded in the Discord message.
-            let errs: Vec<String> = err.iter()
-                .map(|error|"► ".to_string() + tr!(ctx, error).as_str())
-                .collect();
+    server.update().await?;
 
-            let errors = errs.join("\n");
-
-            let message = ctx.reply_builder(
-                CreateReply::default()
-                    .embed(CreateEmbed::new()
-                        .color(Colour::from_rgb(255, 0, 0))
-                        .description(tr!(ctx, "setup__setup_error_message", errors: errors.as_str()))
-                        .title(tr!(ctx, "setup__setup_error_title"))
-                    )
-            ).reply(true);
-            let message_result = ctx.send(message).await;
-            match message_result {
-                Ok(_) => {}
-                Err(_) => {
-                    log!(Level::Error, "Error while sending error message:\
-                     {}", tr!(ctx, "setup__setup_error_message", errors: errors.as_str()));
-                }
-            }
-        }
+    match result {
+        Ok(_) => {Ok("setup_server__success")}
+        Err(_) => {Err("setup_server__failed".into())}
     }
-
-    Ok(())
 }

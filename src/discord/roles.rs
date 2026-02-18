@@ -40,7 +40,7 @@ lazy_static!(
 );
 
 
-pub async fn create_role(ctx: Context<'_>, role_name: String, role_permissions: Permissions) -> serenity::Result<Role> {
+pub async fn create_role(ctx: &Context<'_>, role_name: String, role_permissions: Permissions) -> serenity::Result<Role> {
     EditRole::new()
         .name(role_name)
         .permissions(role_permissions)
@@ -48,7 +48,7 @@ pub async fn create_role(ctx: Context<'_>, role_name: String, role_permissions: 
 }
 
 pub async fn edit_role_positions(
-    ctx: Context<'_>,
+    ctx: &Context<'_>,
     guild_id: GuildId,
     positions: Vec<(RoleId, Option<u64>)>,
 ) -> serenity::Result<Vec<Role>> {

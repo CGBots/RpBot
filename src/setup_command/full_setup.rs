@@ -5,12 +5,9 @@
 //! and specialized channels). It includes automatic rollback capabilities in case of failures.
 
 use crate::database::server::Server;
-use crate::discord::poise_structs::Context;
+use crate::discord::poise_structs::{Context, Error};
 use crate::setup_command::complementary_setup::complementary_setup;
 use crate::setup_command::partial_setup::partial_setup;
-use serenity::all::{GuildChannel, Role};
-use futures::future::BoxFuture;
-use poise::futures_util::future::join_all;
 
 /// Performs a complete setup of the Discord server including roles, channels, and categories.
 ///
@@ -56,50 +53,8 @@ use poise::futures_util::future::join_all;
 ///     }
 /// }
 /// ```
-pub async fn full_setup<'a>(ctx: Context<'_>, server: &'a mut Server) -> Result<(&'a str, Vec<Role>, Vec<GuildChannel>), Vec<&'a str>> {
-    let partial_setup_result = partial_setup(ctx, server).await;
-
-    if partial_setup_result.is_err() {
-        return Err(partial_setup_result.unwrap_err());
-    }
-
-    let complementary_setup_result = complementary_setup(ctx, server).await;
-
-    if complementary_setup_result.is_err() {
-        // Rollback mechanism: If complementary setup fails, we need to clean up all resources
-        // created during partial setup to avoid leaving the server in an inconsistent state
-        let (_, roles, channels) = partial_setup_result.unwrap();
-
-        // Create async delete tasks for all roles created during partial setup
-        let role_futures = roles.into_iter().map(|mut role| {
-            Box::pin(async move {
-                role.delete(ctx).await;
-            }) as BoxFuture<'_, ()>
-        });
-
-        // Create async delete tasks for all channels created during partial setup
-        let channel_futures = channels.into_iter().map(|channel| {
-            Box::pin(async move {
-                channel.delete(ctx).await;
-            }) as BoxFuture<'_, ()>
-        });
-
-        // Chain all futures together (roles + channels) for concurrent execution
-        let all_futures = role_futures.chain(channel_futures);
-
-        // Execute all delete operations concurrently and wait for completion
-        join_all(all_futures).await;
-
-        return Err(complementary_setup_result.unwrap_err());
-    }
-
-    // Aggregate results from both setup phases into combined vectors
-    // Clone is necessary here because we need to extract values from Result types
-    // while maintaining ownership for the return value
-    let mut roles = partial_setup_result.clone()?.1;
-    roles.extend(complementary_setup_result.clone().unwrap().1);
-    let mut channels = partial_setup_result.clone()?.2;
-    channels.extend(complementary_setup_result.clone().unwrap().2);
-
-    Ok(("setup__setup_success_message", roles, channels))
+pub async fn full_setup<'a>(ctx: &Context<'_>, server: &'a mut Server, snapshot: Server) -> Result<&'static str, Error> {
+    partial_setup(ctx, server, snapshot).await?;
+    complementary_setup(ctx, server, snapshot).await?;
+    Ok("setup__full_setup_success")
 }

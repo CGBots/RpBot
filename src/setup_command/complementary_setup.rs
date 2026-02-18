@@ -8,10 +8,10 @@
 //! server consistency.
 
 use log::{log, Level};
-use serenity::all::{ChannelType, GuildChannel, Role};
+use serenity::all::{ChannelType, GuildChannel};
 use crate::database::server::{Id, IdType, Server};
 use crate::discord::channels::{create_channel, get_admin_category_permission_set, get_rp_character_permission_set};
-use crate::discord::poise_structs::Context;
+use crate::discord::poise_structs::{Context, Error};
 use crate::tr;
 
 /// Performs complementary setup for a Discord server by creating required categories and channels.
@@ -83,7 +83,7 @@ use crate::tr;
 /// - All created resources are tracked for potential rollback
 /// - Channel reordering may fail silently without affecting overall success
 /// - Requires appropriate bot permissions (Administrator recommended)
-pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) -> Result<(&'a str, Vec<Role>, Vec<GuildChannel>), Vec<&'a str>> {
+pub async fn complementary_setup<'a>(ctx: &Context<'_>, server : &'a mut Server, snapshot: Server) -> Result<&'a str, Error> {
     let mut created_categories: Vec<GuildChannel> = vec![];
     let mut errors: Vec<&str> = vec![];
 
@@ -94,20 +94,28 @@ pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) 
     // 2. If exists, try to fetch from Discord (may have been manually deleted)
     // 3. If fetch fails or ID is None, create new category
     // 4. Track newly created categories for potential rollback
-    let admin_category_permissions = get_admin_category_permission_set(server.everyone_role_id.id.unwrap().into(), server.spectator_role_id.id.unwrap().into(), server.player_role_id.id.unwrap().into(), server.moderator_role_id.id.unwrap().into());
-    let admin_category_result = match server.admin_category_id.id{
+    let admin_category_permissions = get_admin_category_permission_set(
+        server.everyone_role_id.clone().unwrap().id.into(),
+        server.spectator_role_id.clone().unwrap().id.into(),
+        server.player_role_id.clone().unwrap().id.into(),
+        server.moderator_role_id.clone().unwrap().id.into());
+
+    let admin_category_result = match server.admin_category_id{
         None => {
-            match create_channel(ctx, tr!(ctx, "admin_category_name"), ChannelType::Category, 0, admin_category_permissions, None).await {
+            match create_channel(ctx, tr!(*ctx, "admin_category_name"), ChannelType::Category, 0, admin_category_permissions, None).await {
                 Ok(category) => { created_categories.push(category.clone()); Ok(category)}
                 Err(e) => {errors.push("setup__admin_category_not_created"); Err(e)}
             }
         }
         Some(channel_id) => {
-            match ctx.http().get_channel(channel_id.into()).await{
+            match ctx.http().get_channel(channel_id.id.into()).await{
                 Ok(channel) => {Ok(channel.guild().unwrap())}
                 Err(_) => {
-                    match create_channel(ctx, tr!(ctx, "admin_category_name"), ChannelType::Category, 0, admin_category_permissions, None).await {
-                        Ok(category) => { created_categories.push(category.clone()); Ok(category)}
+                    match create_channel(ctx, tr!(*ctx, "admin_category_name"), ChannelType::Category, 0, admin_category_permissions, None).await {
+                        Ok(category) => {
+                            server.admin_category_id((category.id.get(), IdType::Category));
+                            created_categories.push(category.clone());
+                            Ok(category)}
                         Err(e) => {errors.push("setup__admin_category_not_created"); Err(e)}
                     }
                 }
@@ -115,19 +123,22 @@ pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) 
         }
     };
 
-    let nrp_category_result = match server.nrp_category_id.id{
+    let nrp_category_result = match server.nrp_category_id{
         None => {
-            match create_channel(ctx, tr!(ctx, "nrp_category_name"), ChannelType::Category, 1, vec![], None).await {
+            match create_channel(ctx, tr!(*ctx, "nrp_category_name"), ChannelType::Category, 1, vec![], None).await {
                 Ok(category) => {created_categories.push(category.clone()); Ok(category)}
                 Err(e) => {errors.push("setup__nrp_category_not_created"); Err(e)}
             }
         }
         Some(channel_id) => {
-            match ctx.http().get_channel(channel_id.into()).await{
+            match ctx.http().get_channel(channel_id.id.into()).await{
                 Ok(channel) => {Ok(channel.guild().unwrap())}
                 Err(_) => {
-                    match create_channel(ctx, tr!(ctx, "nrp_category_name"), ChannelType::Category, 1, vec![], None).await {
-                        Ok(category) => {created_categories.push(category.clone()); Ok(category)}
+                    match create_channel(ctx, tr!(*ctx, "nrp_category_name"), ChannelType::Category, 1, vec![], None).await {
+                        Ok(category) => {
+                            server.nrp_category_id((category.id.get(), IdType::Category));
+                            created_categories.push(category.clone());
+                            Ok(category)}
                         Err(e) => {errors.push("setup__nrp_category_not_created"); Err(e)}
                     }
                 }
@@ -135,19 +146,22 @@ pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) 
         }
     };
 
-    let rp_category_result = match server.rp_category_id.id{
+    let rp_category_result = match server.rp_category_id{
         None => {
-            match create_channel(ctx, tr!(ctx, "rp_category_name"), ChannelType::Category, 1, vec![], None).await {
+            match create_channel(ctx, tr!(*ctx, "rp_category_name"), ChannelType::Category, 1, vec![], None).await {
                 Ok(category) => {created_categories.push(category.clone()); Ok(category)}
                 Err(e) => {errors.push("setup__rp_category_not_created"); Err(e)}
             }
         }
         Some(channel_id) => {
-            match ctx.http().get_channel(channel_id.into()).await{
+            match ctx.http().get_channel(channel_id.id.into()).await{
                 Ok(channel) => {Ok(channel.guild().unwrap())}
                 Err(_) => {
-                    match create_channel(ctx, tr!(ctx, "rp_category_name"), ChannelType::Category, 1, vec![], None).await {
-                        Ok(category) => {created_categories.push(category.clone()); Ok(category)}
+                    match create_channel(ctx, tr!(*ctx, "rp_category_name"), ChannelType::Category, 1, vec![], None).await {
+                        Ok(category) => {
+                            server.rp_category_id((category.id.get(), IdType::Category));
+                            created_categories.push(category.clone());
+                            Ok(category)}
                         Err(e) => {errors.push("setup__rp_category_not_created"); Err(e)}
                     }
                 }
@@ -159,19 +173,8 @@ pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) 
     // to maintain server consistency. Only categories added to created_categories
     // vector (i.e., newly created, not pre-existing) are deleted.
     if !errors.is_empty() {
-        for channel in created_categories{
-            match channel.clone().delete(ctx).await {
-                Ok(_) => {}
-                Err(_) => {
-                    log!(Level::Error, "Error while setuping and rollbacking.\
-                     universe_id: {}\
-                     server_id: {}\
-                     category_id: {}", server.universe_id, server.server_id, channel.id);
-                    return Err(vec!["setup__rollback_failed"])
-                }
-            }
-        }
-        return Err(errors)
+
+        return Err("setup__roles_setup_failed".into())
     }
 
     let admin_category = admin_category_result.unwrap();
@@ -186,19 +189,19 @@ pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) 
     // - Verify channel still exists on Discord
     // - Create if missing, passing parent category ID to nest the channel
     // - Track all channels (new and existing) for potential rollback
-    let log_channel_result = match server.log_channel_id.id{
+    let log_channel_result = match server.log_channel_id{
         None => {
-            let result = create_channel(ctx, tr!(ctx, "log_channel_name"), ChannelType::Text, 0, vec![], Some(admin_category.clone().id.get())).await;
+            let result = create_channel(ctx, tr!(*ctx, "log_channel_name"), ChannelType::Text, 0, vec![], Some(admin_category.clone().id.get())).await;
             match result {
                 Ok(channel) => {created_channels.push(channel.clone()); Ok(channel)}
                 Err(e) => { errors.push("setup__log_channel_not_created"); Err(e)}
             }
         }
         Some(channel_id) => {
-            match ctx.http().get_channel(channel_id.into()).await{
+            match ctx.http().get_channel(channel_id.id.into()).await{
                 Ok(channel) => {created_channels.push(channel.clone().guild().unwrap().clone()); Ok(channel.guild().unwrap())}
                 Err(_) => {
-                    let result = create_channel(ctx, tr!(ctx, "log_channel_name"), ChannelType::Text, 0, vec![], Some(admin_category.clone().id.get())).await;
+                    let result = create_channel(ctx, tr!(*ctx, "log_channel_name"), ChannelType::Text, 0, vec![], Some(admin_category.clone().id.get())).await;
                     match result{
                         Ok(channel) => {created_channels.push(channel.clone()); Ok(channel)}
                         Err(e) => { errors.push("setup__log_channel_not_created"); Err(e)}
@@ -208,19 +211,19 @@ pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) 
         }
     };
 
-    let commands_channel_result = match server.commands_channel_id.id{
+    let commands_channel_result = match server.commands_channel_id{
         None => {
-            let result = create_channel(ctx, tr!(ctx, "commands_channel_name"), ChannelType::Text, 0, vec![], Some(admin_category.clone().id.get())).await;
+            let result = create_channel(ctx, tr!(*ctx, "commands_channel_name"), ChannelType::Text, 0, vec![], Some(admin_category.clone().id.get())).await;
             match result {
                 Ok(channel) => {created_channels.push(channel.clone()); Ok(channel)}
                 Err(e) => {errors.push("setup__commands_channel_not_created"); Err(e)}
             }
         }
         Some(channel_id) => {
-            match ctx.http().get_channel(channel_id.into()).await{
+            match ctx.http().get_channel(channel_id.id.into()).await{
                 Ok(channel) => {created_channels.push(channel.clone().guild().unwrap().clone()); Ok(channel.guild().unwrap())}
                 Err(_) => {
-                    let result = create_channel(ctx, tr!(ctx, "commands_channel_name"), ChannelType::Text, 0, vec![], Some(admin_category.clone().id.get())).await;
+                    let result = create_channel(ctx, tr!(*ctx, "commands_channel_name"), ChannelType::Text, 0, vec![], Some(admin_category.clone().id.get())).await;
                     match result{
                         Ok(channel) => {created_channels.push(channel.clone()); Ok(channel)}
                         Err(e) => {errors.push("setup__commands_channel_not_created"); Err(e)}
@@ -230,19 +233,19 @@ pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) 
         }
     };
 
-    let moderation_channel_result = match server.moderation_channel_id.id{
+    let moderation_channel_result = match server.moderation_channel_id{
         None => {
-            let result = create_channel(ctx, tr!(ctx, "moderation_channel_name"), ChannelType::Text, 0, vec![], Some(admin_category.clone().id.get())).await;
+            let result = create_channel(ctx, tr!(*ctx, "moderation_channel_name"), ChannelType::Text, 0, vec![], Some(admin_category.clone().id.get())).await;
             match result {
                 Ok(channel) => {created_channels.push(channel.clone()); Ok(channel)}
                 Err(e) => {errors.push("setup__moderation_channel_not_created"); Err(e)}
             }
         }
         Some(channel_id) => {
-            match ctx.http().get_channel(channel_id.into()).await{
+            match ctx.http().get_channel(channel_id.id.into()).await{
                 Ok(channel) => {created_channels.push(channel.clone().guild().unwrap().clone()); Ok(channel.guild().unwrap())}
                 Err(_) => {
-                    let result = create_channel(ctx, tr!(ctx, "moderation_channel_name"), ChannelType::Text, 0, vec![], Some(admin_category.clone().id.get())).await;
+                    let result = create_channel(ctx, tr!(*ctx, "moderation_channel_name"), ChannelType::Text, 0, vec![], Some(admin_category.clone().id.get())).await;
                     match result{
                         Ok(channel) => {created_channels.push(channel.clone()); Ok(channel)}
                         Err(e) => {errors.push("setup__moderation_channel_not_created"); Err(e)}
@@ -252,19 +255,19 @@ pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) 
         }
     };
 
-    let nrp_general_channel_result = match server.nrp_general_channel_id.id{
+    let nrp_general_channel_result = match server.nrp_general_channel_id{
         None => {
-            let result = create_channel(ctx, tr!(ctx, "nrp_general_channel_name"), ChannelType::Text, 0, vec![], Some(nrp_category.clone().id.get())).await;
+            let result = create_channel(ctx, tr!(*ctx, "nrp_general_channel_name"), ChannelType::Text, 0, vec![], Some(nrp_category.clone().id.get())).await;
             match result {
                 Ok(channel) => {created_channels.push(channel.clone()); Ok(channel)}
                 Err(e) => {errors.push("setup__nrp_general_channel_not_created"); Err(e)}
             }
         }
         Some(channel_id) => {
-            match ctx.http().get_channel(channel_id.into()).await{
+            match ctx.http().get_channel(channel_id.id.into()).await{
                 Ok(channel) => {created_channels.push(channel.clone().guild().unwrap().clone()); Ok(channel.guild().unwrap())}
                 Err(_) => {
-                    let result = create_channel(ctx, tr!(ctx, "nrp_general_channel_name"), ChannelType::Text, 0, vec![], Some(nrp_category.clone().id.get())).await;
+                    let result = create_channel(ctx, tr!(*ctx, "nrp_general_channel_name"), ChannelType::Text, 0, vec![], Some(nrp_category.clone().id.get())).await;
                     match result{
                         Ok(channel) => {created_channels.push(channel.clone()); Ok(channel)}
                         Err(e) => {errors.push("setup__nrp_general_channel_not_created"); Err(e)}
@@ -274,21 +277,21 @@ pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) 
         }
     };
 
-    let character_channel_permissions = get_rp_character_permission_set(server.player_role_id.id.unwrap().into());
+    let character_channel_permissions = get_rp_character_permission_set(server.player_role_id.clone().unwrap().id.into());
 
-    let rp_character_channel = match server.rp_character_channel_id.id{
+    let rp_character_channel = match server.rp_character_channel_id{
         None => {
-            let result = create_channel(ctx, tr!(ctx, "rp_character_channel_name"), ChannelType::Text, 0, character_channel_permissions, Some(rp_category.clone().id.get())).await;
+            let result = create_channel(ctx, tr!(*ctx, "rp_character_channel_name"), ChannelType::Text, 0, character_channel_permissions, Some(rp_category.clone().id.get())).await;
             match result {
                 Ok(channel) => {created_channels.push(channel.clone()); Ok(channel)}
                 Err(e) => {errors.push("setup__rp_character_channel_not_created"); Err(e)}
             }
         }
         Some(channel_id) => {
-            match ctx.http().get_channel(channel_id.into()).await{
+            match ctx.http().get_channel(channel_id.id.into()).await{
                 Ok(channel) => {created_channels.push(channel.clone().guild().unwrap().clone()); Ok(channel.guild().unwrap())}
                 Err(_) => {
-                    let result = create_channel(ctx, tr!(ctx, "rp_character_channel_name"), ChannelType::Text, 0, character_channel_permissions, Some(rp_category.clone().id.get())).await;
+                    let result = create_channel(ctx, tr!(*ctx, "rp_character_channel_name"), ChannelType::Text, 0, character_channel_permissions, Some(rp_category.clone().id.get())).await;
                     match result{
                         Ok(channel) => {created_channels.push(channel.clone()); Ok(channel)}
                         Err(e) => {errors.push("setup__rp_character_channel_not_created"); Err(e)}
@@ -299,19 +302,19 @@ pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) 
     };
 
 
-    let wiki_channel_result = match server.rp_wiki_channel_id.id{
+    let wiki_channel_result = match server.rp_wiki_channel_id{
         None => {
-            let result = create_channel(ctx, tr!(ctx, "rp_wiki_channel_name"), ChannelType::Forum, 0, vec![], Some(rp_category.clone().id.get())).await;
+            let result = create_channel(ctx, tr!(*ctx, "rp_wiki_channel_name"), ChannelType::Forum, 0, vec![], Some(rp_category.clone().id.get())).await;
             match result {
                 Ok(channel) => {created_channels.push(channel.clone()); Ok(channel)}
                 Err(e) => {errors.push("setup__wiki_channel_not_created"); Err(e)}
             }
         }
         Some(channel_id) => {
-            match ctx.http().get_channel(channel_id.into()).await{
+            match ctx.http().get_channel(channel_id.id.into()).await{
                 Ok(channel) => {created_channels.push(channel.clone().guild().unwrap().clone()); Ok(channel.guild().unwrap())}
                 Err(_) => {
-                    let result = create_channel(ctx, tr!(ctx, "rp_wiki_channel_name"), ChannelType::Forum, 0, vec![], Some(rp_category.clone().id.get())).await;
+                    let result = create_channel(ctx, tr!(*ctx, "rp_wiki_channel_name"), ChannelType::Forum, 0, vec![], Some(rp_category.clone().id.get())).await;
                     match result{
                         Ok(channel) => {created_channels.push(channel.clone()); Ok(channel)}
                         Err(e) => {errors.push("setup__wiki_channel_not_created"); Err(e)}
@@ -324,20 +327,18 @@ pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) 
     // If any channel creation failed, rollback all tracked channels.
     // Note: This includes both newly created and pre-existing channels from the
     // created_channels vector, ensuring complete cleanup on failure.
-    if !errors.is_empty() {
-        for channel in created_channels{
+    created_channels.append(&mut created_categories);
+    if !errors.is_empty()  {
+        for channel in created_channels {
             match channel.clone().delete(ctx).await {
                 Ok(_) => {}
                 Err(_) => {
-                    log!(Level::Error, "Error while setuping and rollbacking.\
-                     universe_id: {}\
-                     server_id: {}\
-                     category_id: {}", server.universe_id, server.server_id, channel.id);
-                    return Err(vec!["setup__rollback_failed"])
+                    server.rollback(ctx, snapshot).await;
+                    return Err("setup__rollback_failed".into())
                 }
             }
         }
-        return Err(errors)
+        return Err("setup__channel_setup_failed".into())
     }
 
     let log_channel = log_channel_result.unwrap();
@@ -349,29 +350,29 @@ pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) 
 
 
 
-    server.nrp_category_id = Id{ id: Some(nrp_category.id.get()), id_type: Some(IdType::Category) };
-    server.rp_category_id = Id{ id: Some(rp_category.id.get()), id_type: Some(IdType::Category) };
-    server.admin_category_id = Id{ id: Some(admin_category.id.get()), id_type: Some(IdType::Category) };
-    server.log_channel_id = Id{id: Some(log_channel.id.get()), id_type: Some(IdType::Channel)};
-    server.commands_channel_id = Id{id: Some(commands_channel.id.get()), id_type: Some(IdType::Channel)};
-    server.moderation_channel_id = Id{id: Some(moderation_channel.id.get()), id_type: Some(IdType::Channel)};
-    server.nrp_general_channel_id = Id{id: Some(nrp_general_channel.id.get()), id_type: Some(IdType::Channel)};
-    server.rp_character_channel_id = Id{id: Some(rp_character_channel.id.get()), id_type: Some(IdType::Channel)};
-    server.rp_wiki_channel_id = Id{id: Some(wiki_channel.id.get()), id_type: Some(IdType::Channel)};
+    server.nrp_category_id(Id{ id: nrp_category.id.get(), id_type: IdType::Category });
+    server.rp_category_id(Id{ id: rp_category.id.get(), id_type: IdType::Category });
+    server.admin_category_id(Id{ id: admin_category.id.get(), id_type: IdType::Category });
+    server.log_channel_id(Id{id: log_channel.id.get(), id_type: IdType::Channel });
+    server.commands_channel_id(Id{id: commands_channel.id.get(), id_type: IdType::Channel });
+    server.moderation_channel_id(Id{id: moderation_channel.id.get(), id_type: IdType::Channel });
+    server.nrp_general_channel_id(Id{id: nrp_general_channel.id.get(), id_type: IdType::Channel });
+    server.rp_character_channel_id(Id{id: rp_character_channel.id.get(), id_type: IdType::Channel });
+    server.rp_wiki_channel_id(Id{id: wiki_channel.id.get(), id_type: IdType::Channel });
 
     // Reorder categories to maintain consistent structure:
     // Position 0-3: Our managed categories (admin, nrp, rp, road)
     // Position 4+: All other existing channels/categories in the guild
     // This ensures our categories appear at the top while preserving
     // any user-created channels below them.
-    let mut channel_order = vec![(admin_category.id, 0), (nrp_category.id, 1), (rp_category.id, 2), (server.road_category_id.id.unwrap().into(), 3)];
+    let mut channel_order = vec![(admin_category.id, 0), (nrp_category.id, 1), (rp_category.id, 2), (server.road_category_id.unwrap().id.into(), 3)];
     let channels = ctx.guild_id().unwrap().channels(ctx).await.unwrap();
 
     let allowed = [
         admin_category.id.get(),
         nrp_category.id.get(),
         rp_category.id.get(),
-        server.road_category_id.id.unwrap().into()
+        server.road_category_id.unwrap().id.into()
     ];
 
     for (channel_id, _) in channels{
@@ -403,24 +404,12 @@ pub async fn complementary_setup<'a>(ctx: Context<'_>, server : &'a mut Server) 
                      universe_id: {}\
                      server_id: {}\
                      channel_id: {}", server.universe_id, server.server_id, channel.id);
-                        return Err(vec!["setup__rollback_failed"])
+                        return Err("setup__rollback_failed".into())
                     }
                 }
             }
-            for category in created_categories{
-                match category.clone().delete(ctx).await {
-                    Ok(_) => {}
-                    Err(_) => {
-                        log!(Level::Error, "Error while setuping and rollbacking.\
-                     universe_id: {}\
-                     server_id: {}\
-                     category_id: {}", server.universe_id, server.server_id, category.id);
-                        return Err(vec!["setup__rollback_failed"])
-                    }
-                }
-            }
-            return Err(vec!["setup__server_update_failed"])}
+            return Err("setup__server_update_failed".into())}
     };
 
-    Ok(("setup__setup_success_message", vec![], vec![]))
+    Ok("setup__setup_success_message")
 }

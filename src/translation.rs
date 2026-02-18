@@ -30,10 +30,10 @@ macro_rules! tr {
         #[allow(unused_mut)]
         let mut args = fluent::FluentArgs::new();
         $( args.set(stringify!($argname), $argvalue); )*
-        $crate::translation::smart_tr($ctx, $id, Some(&args)).unwrap()
+        $crate::translation::smart_tr($ctx, $id, Some(&args)).unwrap_or_else(|_| $id.to_string())
     }};
     ( $ctx:expr, $id:expr ) => {{
-        $crate::translation::smart_tr($ctx, $id, None).unwrap()
+        $crate::translation::smart_tr($ctx, $id, None).unwrap_or_else(|_| $id.to_string())
     }};
 }
 #[allow(unused_imports)]
@@ -183,12 +183,17 @@ pub fn smart_tr(
         .and_then(|locale| translations.other.get(locale))
         .unwrap_or(&translations.main);
 
-    let message = bundle.get_message(id)
-        .or_else(|| translations.main.get_message(id))
-        .ok_or_else(|| format!("Missing Fluent message for id `{}`", id))?;
+    // If the token doesn't exist, just return it (visible + debuggable).
+    let message = match bundle.get_message(id).or_else(|| translations.main.get_message(id)) {
+        Some(message) => message,
+        None => return Ok(id.to_string()),
+    };
 
-    let pattern = message.value()
-        .ok_or_else(|| format!("Message `{}` has no value", id))?;
+    // If the message exists but has no value, also fall back to the token.
+    let pattern = match message.value() {
+        Some(pattern) => pattern,
+        None => return Ok(id.to_string()),
+    };
 
     let raw_text = bundle.format_pattern(pattern, None, &mut vec![]).into_owned();
     let used_vars = extract_variables_from_pattern(&raw_text);
@@ -208,10 +213,9 @@ pub fn smart_tr(
             {
                 args.set(var.clone(), FluentValue::from(value));
             } else {
-                return Err(format!(
-                    "Missing variable `{var}` and fallback `{}` not found",
-                    fallback_id
-                ).into());
+                // Can't resolve a required variable -> return the token
+                // (alternatively, return `raw_text` to show `{$var}` placeholders).
+                return Ok(id.to_string());
             }
         }
     }

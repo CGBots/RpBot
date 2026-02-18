@@ -1,4 +1,4 @@
-use crate::add_server_to_universe_command::logic::{add_server_to_universe, check_server_in_universe};
+use crate::add_server_to_universe_command::logic::{check_server_in_universe};
 use crate::discord::poise_structs::{Context, Error};
 use crate::tr;
 use crate::database::universe::Universe;
@@ -8,9 +8,10 @@ use serenity::all::CreateSelectMenuKind;
 use serenity::all::CreateSelectMenuOption;
 use serenity::all::{
     ComponentInteractionCollector, ComponentInteractionDataKind, CreateActionRow,
-    EditInteractionResponse,
 };
-use crate::setup_command::handler::{setup, SetupType, _setup};
+use crate::database::server::Server;
+use crate::setup_command::handler::{SetupType, _setup};
+use crate::utility::reply::reply;
 
 /// Links the current Discord server (guild) to one of the universes created by the user.
 ///
@@ -25,7 +26,7 @@ use crate::setup_command::handler::{setup, SetupType, _setup};
 ///    If it is, the command responds with a localized `"already_bind"` message.
 ///
 /// 2. If not yet linked, it retrieves all universes created by the current user
-///    using [`Universe::get_universe_creator`].
+///    using [`Universe::get_creator_universes`].
 ///    If the user owns no universes, a localized `"universes_unavailable"` message
 ///    is sent.
 ///
@@ -65,36 +66,29 @@ use crate::setup_command::handler::{setup, SetupType, _setup};
 ///
 /// The user is prompted with a menu listing all universes they own.
 /// Selecting one will link the current guild to that universe.
+///
+
+
 #[poise::command(slash_command, required_permissions = "ADMINISTRATOR", guild_only)]
 pub async fn add_server(ctx: Context<'_>, setup_type: SetupType) -> Result<(), Error> {
-    ctx.defer().await.unwrap();
+    ctx.defer().await?;
+    let result = _add_server(&ctx, setup_type).await;
+    reply(ctx, result).await?;
+    Ok(())
+}
 
-    match check_server_in_universe(ctx.guild_id().unwrap().get()).await {
-        Ok(_) => {
-            ctx.send(
-                CreateReply::default()
-                    .content(tr!(ctx, "already_bind"))
-                    .ephemeral(true),
-            )
-            .await?;
-            return Ok(());
-        }
-        _ => {}
+pub async fn _add_server(ctx: &Context<'_>, setup_type: SetupType) -> Result<&'static str, Error>{
+    if check_server_in_universe(ctx.guild_id().unwrap().get()).await.is_ok() {
+        return Ok("add_server_to_universe__already_bind");
     }
 
-    let universes: Vec<Universe> = Universe::get_universe_creator(ctx.author().id.get()).await;
+    let universes: Vec<Universe> = Universe::get_creator_universes(ctx.author().id.get()).await;
 
     if universes.is_empty() {
-        ctx.send(
-            CreateReply::default()
-                .content(tr!(ctx, "universes_unavailable"))
-                .ephemeral(true),
-            )
-            .await?;
-        return Ok(())
+        return Err("add_server_to_universe__universes_unavailable".into());
     }
-    
-    let mut options = vec![];    
+
+    let mut options = vec![];
     for universe in &universes {
         options.push(CreateSelectMenuOption::new(
             universe.name.clone(),
@@ -110,30 +104,57 @@ pub async fn add_server(ctx: Context<'_>, setup_type: SetupType) -> Result<(), E
     let message = ctx
         .send(
             CreateReply::default()
-                .content(tr!(ctx, "choose_universe"))
+                .content(tr!(*ctx, "choose_universe"))
                 .components(vec![action_row])
                 .ephemeral(true),
         )
         .await?;
 
-    while let Some(mci) = ComponentInteractionCollector::new(ctx)
+    let serenity_context = ctx.serenity_context();
+
+    let result = while let Some(mci) = ComponentInteractionCollector::new(serenity_context)
         .timeout(std::time::Duration::from_secs(120))
         .filter(move |mci| mci.data.custom_id == "selected_universe")
         .await
     {
         if let ComponentInteractionDataKind::StringSelect { values } = &mci.data.kind {
             if let Some(selected) = values.get(0) {
-                message.delete(ctx).await;
-                let universe = add_server_to_universe(selected.clone(), ctx.guild_id().unwrap().get()).await?;
-                _setup(ctx, setup_type).await.unwrap();
-                mci.create_response(ctx.http(), serenity::all::CreateInteractionResponse::UpdateMessage(
-                    serenity::all::CreateInteractionResponseMessage::new()
-                        .content(tr!(ctx, "guild_linked", universe_name: universe.name))
-                        .components(vec![])
-                )).await?;
+                let _ = message.delete(*ctx).await;
+
+                let Some(universe) = Universe::get_universe_by_id(selected.to_string()).await? else {return Err("placeholder".into())};
+
+                let res = universe.clone().check_server_limit().await?;
+
+                if !res{
+                    return Err("exceed_limit_number_of_servers_per_universe".into())
+                }
+
+                let server = Server{
+                    _id: Default::default(),
+                    universe_id: universe.universe_id,
+                    server_id: ctx.guild_id().unwrap().get(),
+                    admin_role_id: Default::default(),
+                    moderator_role_id: Default::default(),
+                    spectator_role_id: Default::default(),
+                    player_role_id: Default::default(),
+                    everyone_role_id: Default::default(),
+                    admin_category_id: Default::default(),
+                    nrp_category_id: Default::default(),
+                    rp_category_id: Default::default(),
+                    road_category_id: Default::default(),
+                    rp_wiki_channel_id: Default::default(),
+                    log_channel_id: Default::default(),
+                    moderation_channel_id: Default::default(),
+                    commands_channel_id: Default::default(),
+                    nrp_general_channel_id: Default::default(),
+                    rp_character_channel_id: Default::default(),
+                }.insert_server().await?;
+                _setup(&ctx, setup_type).await?;
+
+                return Ok("add_server_to_universe__guild_linked");
             }
         }
-    }
+    };
 
-    Ok(())
+    Ok("")
 }

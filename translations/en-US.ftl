@@ -5,104 +5,196 @@ support = contact.cgbots@gmail.com
 ping = ping
     .description = allows to ping the bot and get the sending delay
 
-create_universe = create_universe
-    .description = Create a new Universe. A guild can be attached to only one universe at a time.
-    .universe_name = universe_name
-    .universe_name-description = Name of the new universe
-    .setup_type = {setup.setup_type}
-    .setup_type-description = {setup.setup_type-description}
-
 start = start
     .description = Show startup instructions on the channel.
 
+#Stats
+stat_insert__failed = Failed to insert statistics
+
+#Reply
+reply__reply_failed = Failed to send reply
+
+#Universe
 universe = universe
-    .description = universe
+    .description = Universe management
+check_universe_ownership__universe_not_found = Universe not found
+    .title = Universe Not Found
+    .mesage = The requested universe could not be found
+universe_delete__failed = Failed to delete universe
+universe_delete__passed = Universe deleted successfully
+universe__check_server_limit_failed = Failed to check server limit
+    .title = Server Limit Check Failed
+    .message = Unable to verify server limits for this universe
 
-admin_role_name = Admin
-moderator_role_name = Moderator
-spectator_role_name = Spectator
-player_role_name = Player
-
-road_channel_name = Roads
-
-
-admin_category_name = Administration
-setup__admin_category_not_created = The category {$admin_category_name} could not be created.
-nrp_category_name =  Non-RP
-setup__nrp_category_not_created = The category {$nrp_category_name} could not be created.
-rp_category_name = RolePlay
-setup__rp_category_not_created = The category {$rp_category_name} could not be created.
-log_channel_name = Logs
-setup__log_channel_not_created = The channel {$log_channel_name} could not be created.
-commands_channel_name = Commands
-setup__commands_channel_not_created = The channel {$commands_channel_name} could not be created.
-moderation_channel_name = Moderation
-setup__moderation_channel_not_created = The channel {$moderation_channel_name} could not be created.
-nrp_general_channel_name = General
-setup__nrp_general_channel_not_created = The channel {$nrp_general_channel_name} could not be created.
-rp_character_channel_name = Character Sheets
-setup__rp_character_channel_not_created = The channel {$rp_character_channel_name} could not be created.
-rp_wiki_channel_name = Wiki
-setup__wiki_channel_not_created = The channel {$rp_wiki_channel_name} could not be created.
-
-
-setup = setup
-    .description = Used to create roles and channnels.
+#Create universe
+create_universe = new_universe
+    .description = Allows you to create a new universe. A server can only be attached to one universe at a time.
+    .universe_name = name
+    .universe_name-description = Name of the new Universe
     .setup_type = setup_type
-    .setup_type-description = Full -> admin, character, creation, and wiki channels. Minimal -> necessary only.
+    .setup_type-description = The type of setup for this server
+create_universe__check_universe_limit_failed = Failed to check universe limit
+    .title = Universe Limit Check Failed
+    .message = Unable to verify universe limits
+create_universe__universe_limit_reached = Universe limit reached
+    .title = Universe Limit Reached
+    .message = You have reached the maximum number of universes allowed
+create_universe__get_server_failed = Failed to retrieve server
+    .title = Server Retrieval Failed
+    .message = Unable to retrieve server information
+create_universe__already_exist_for_this_server = Universe already exists for this server
+    .title = Universe Already Exists
+    .message = This server is already attached to a universe
+create_universe__setup_constraints_failed = Failed to setup constraints
+    .title = Setup Constraints Failed
+    .message = Unable to apply setup constraints
+create_universe__server_insert_failed = Failed to insert server
+    .title = Server Insert Failed
+    .message = Unable to save server to database
+create_universe__universe_insert_failed = Failed to insert universe
+    .title = Universe Insert Failed
+    .message = Unable to save universe to database
+create_universe__speed_stat_insert_failed = Failed to insert speed statistics
+    .title = Speed Statistics Insert Failed
+    .message = Unable to save speed statistics
+create_universe__universe_successfully_created = Universe created successfully
+    .title = Universe Created
+    .message = Your new universe has been created successfully
 
+#Add server to universe
+add_server_to_universe__already_bind = Server already bound to a universe
+    .title = Server Already Bound
+    .message = This server is already attached to a universe
+add_server_to_universe__universes_unavailable = Universes unavailable
+    .title = Universes Unavailable
+    .message = No universes are currently available
+choose_universe =
+    exceed_limit_number_of_servers_per_universe = Server limit per universe exceeded
+    .title = Server Limit Exceeded
+    .message = This universe has reached the maximum number of servers allowed
+add_server_to_universe__guild_linked = Server linked successfully
+    .title = Server Linked
+    .message = The server has been linked to the universe
+
+#Server
+id__nothing_to_delete = Nothing to delete
+    .title = Nothing to Delete
+    .message = There are no items to delete
+id__role_delete_success = Role deleted successfully
+    .title = Role Deleted
+    .message = The role has been deleted successfully
+id__role_delete_failed = Failed to delete role
+    .title = Role Delete Failed
+    .message = Unable to delete the role
+id__channel_delete_sucess = Channel deleted successfully
+    .title = Channel Deleted
+    .message = The channel has been deleted successfully
+id__channel_delete_failed = Failed to delete channel
+    .title = Channel Delete Failed
+    .message = Unable to delete the channel
+
+#Setup
 FullSetup = Full
+    .description = Roles and all categories, rp, nrp and admin and corresponding channels.
 PartialSetup = Partial
-
+    .description = Only roles and road category
 cancel_setup = Cancel
 continue_setup = Continue
-
-continue_setup_message = The guild appears to be already set up. Items that do not exist or no longer exist will be created.
-
-setup__server_not_found = The guild does not appear to be registered with the bot. Please contact support at {$support}
-setup__server_already_setup_timeout = The selection is timeout.
-setup__canceled = The setup has been cancelled.
-setup__admin_role_not_created = The {$admin_role_name} role could not be created.
-setup__moderator_role_not_created = The {$moderator_role_name} role could not be created.
-setup__spectator_role_not_created = The {$spectator_role_name} role could not be created.
-setup__player_role_not_created = The {$player_role_name} role could not be created.
-setup__reorder_went_wrong = Role reordering failed. Please make sure the roles are ordered as follows: RpBot > {$admin_role_name} > {$moderator_role_name} > {$spectator_role_name} > {$player_role_name}
-setup__road_category_not_created = The road category could not be created.
-setup__server_update_failed = Saving the guild configuration failed.
-setup__universe_not_found = This guild is not associated with any universe.
-setup__setup_success_message = The setup completed successfully.
-setup__setup_success_title = Setup complete.
-setup__setup_error_message = The following errors have been detected:
-    {$errors}
-
-    Please verify the bot's rights. It should be Administrator.
-setup__setup_error_title = guild setup error.
-
-
-
-
-
-already_exist_for_this_server = This guild is already part of a universe.
-
-exceed_limit_number_of_servers_per_universe = You have reached the maximum number of guilds allowed for this universe.
-    To increase the limit, please upgrade to a higher subscription plan.
-
-universes_unavailable = There are no existing universes, or they are not available.
-
-not-in-guild-error = This command must be invoked in a guild.
-
-already_bind = This guild is already bound to a universe.
-
-guild_linked = This guild is now linked to the universe ***{$universe_name}***.
-
-choose_universe = Choose the universe in the list below.
-
-exceed_limit_number_of_universes = You have reached the maximum number of universes you can create.
-
-universe_created = The universe {$universe_name} has been successfully created. The roles and categories is going to be created.
-
-start_message = Thank you for choosing VerseEngine to manage your RP.
-    The first step is to create a universe: `/{$universe} {$create_universe}`
-    Next, you’ll need to set up the roles and channels required: `/{$universe} {$setup}`
-    Once that’s done, you can create your first locations: `/`
-    Then your first routes: `/`
+setup__continue_setup_message = Continue setup message
+    .title = Continue Setup
+    .message = Do you want to continue the setup process?
+setup__server_already_setup_timeout = Server already setup timeout
+    .title = Setup Timeout
+    .message = The server setup has timed out
+setup_server__cancelled = Server setup cancelled
+    .title = Setup Cancelled
+    .message = The server setup has been cancelled
+setup_server__success = Server setup successful
+    .title = Setup Successful
+    .message = The server has been setup successfully
+setup_server__failed = Server setup failed
+    .title = Setup Failed
+    .message = The server setup has failed
+setup__full_setup_success = Full setup successful
+    .title = Full Setup Complete
+    .message = The complete server setup has been completed successfully
+admin_category_name = Admin
+    .title = Admin Category
+    .message = Administrator category
+setup__admin_category_not_created = Admin category not created
+    .title = Admin Category Failed
+    .message = Unable to create admin category
+nrp_category_name = Out of RP
+setup__nrp_category_not_created = Out of RP category not created
+    .title = Out of RP Category Failed
+    .message = Unable to create out of RP category
+rp_category_name = RP
+setup__rp_category_not_created = RP category not created
+    .title = RP Category Failed
+    .message = Unable to create RP category
+setup__roles_setup_failed = Roles setup failed
+    .title = Roles Setup Failed
+    .message = Unable to setup server roles
+log_channel_name = Logs
+setup__log_channel_not_created = Log channel not created
+    .title = Log Channel Failed
+    .message = Unable to create log channel
+commands_channel_name = Commands
+setup__commands_channel_not_created = Commands channel not created
+    .title = Commands Channel Failed
+    .message = Unable to create commands channel
+moderation_channel_name = Moderation
+setup__moderation_channel_not_created = Moderation channel not created
+    .title = Moderation Channel Failed
+    .message = Unable to create moderation channel
+nrp_general_channel_name = General
+setup__nrp_general_channel_not_created = General channel not created
+    .title = General Channel Failed
+    .message = Unable to create general channel
+rp_character_channel_name = Character Sheets
+setup__rp_character_channel_not_created = Character sheets channel not created
+    .title = Character Sheets Channel Failed
+    .message = Unable to create character sheets channel
+rp_wiki_channel_name = Wiki
+setup__wiki_channel_not_created = Wiki channel not created
+    .title = Wiki Channel Failed
+    .message = Unable to create wiki channel
+setup__rollback_failed = Rollback failed
+    .title = Rollback Failed
+    .message = Unable to rollback setup changes
+setup__channel_setup_failed = Channel setup failed
+    .title = Channel Setup Failed
+    .message = Unable to setup channels
+guild_only = Command reserved for servers.
+admin_role_name = Administrator
+setup__admin_role_not_created = Admin role not created
+    .title = Admin Role Failed
+    .message = Unable to create admin role
+moderator_role_name = Moderator
+setup__moderator_role_not_created = Moderator role not created
+    .title = Moderator Role Failed
+    .message = Unable to create moderator role
+spectator_role_name = Spectator
+setup__spectator_role_not_created = Spectator role not created
+    .title = Spectator Role Failed
+    .message = Unable to create spectator role
+player_role_name = Player
+setup__player_role_not_created = Player role not created
+    .title = Player Role Failed
+    .message = Unable to create player role
+setup__error_during_role_creation = Error during role creation
+    .title = Role Creation Error
+    .message = An error occurred while creating roles
+setup__reorder_went_wrong = Reorder went wrong
+    .title = Reorder Failed
+    .message = Unable to reorder roles or channels
+road_channel_name = Roads
+setup__road_category_not_created = Roads category not created
+    .title = Roads Category Failed
+    .message = Unable to create roads category
+setup__server_update_failed = Server update failed
+    .title = Server Update Failed
+    .message = Unable to update server configuration
+setup__setup_success_message = Setup completed successfully
+    .title = Setup Complete
+    .message = The server setup has been completed successfully

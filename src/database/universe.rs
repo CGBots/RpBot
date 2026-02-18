@@ -12,12 +12,18 @@
 
 use futures::TryStreamExt;
 use crate::database::db_client::{DB_CLIENT, connect_db};
-use crate::database::db_namespace::{RPBOT_DB_NAME, UNIVERSE_COLLECTION_NAME};
-use mongodb::bson::doc;
+use crate::database::db_namespace::{RPBOT_DB_NAME, SERVER_COLLECTION_NAME, STATS_COLLECTION_NAME, UNIVERSE_COLLECTION_NAME};
+use mongodb::bson::{doc, from_document};
 use mongodb::bson::oid::ObjectId;
-use mongodb::results::{InsertOneResult, UpdateResult};
+use mongodb::IndexModel;
+use mongodb::options::{IndexOptions};
+use mongodb::results::{CreateIndexResult, InsertOneResult};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
+use tokio::join;
+use crate::database::server::{Server};
+use crate::database::stats::Stat;
+use crate::discord::poise_structs::Error;
 
 /// Maximum number of universes a creator can have in the free tier.
 pub static FREE_LIMIT_UNIVERSE: usize = 2;
@@ -36,11 +42,6 @@ pub struct Universe {
     #[serde(rename = "_id")]
     pub universe_id: ObjectId,
 
-    /// List of server IDs associated with this universe.
-    /// Stored as strings in MongoDB for compatibility.
-    #[serde_as(as = "Vec<DisplayFromStr>")]
-    pub server_ids: Vec<u64>,
-
     /// The display name of the universe.
     pub name: String,
 
@@ -55,9 +56,6 @@ pub struct Universe {
     /// Timestamp of when the universe was created (milliseconds since epoch).
     #[serde_as(as = "DisplayFromStr")]
     pub creation_timestamp: u128,
-
-    /// The default locale/language for this universe (e.g., "en-US", "fr-FR").
-    pub default_locale: String,
 }
 
 impl Universe {
@@ -73,14 +71,39 @@ impl Universe {
     pub async fn get_universe_by_server_id(
         server_id: u64,
     ) -> mongodb::error::Result<Option<Universe>> {
-        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
-        let filter = doc! { "server_ids": {"$in": [server_id.to_string()] } };
-        db_client
-            .database(RPBOT_DB_NAME)
-            .collection::<Universe>(UNIVERSE_COLLECTION_NAME)
-            .find_one(filter)
+        let db_client = DB_CLIENT
+            .get_or_init(|| async { connect_db().await.unwrap() })
             .await
+            .clone();
+
+        let pipeline = vec![
+            doc! { "$match": { "server_id": server_id.to_string() } },
+            doc! { "$lookup": {
+            "from": UNIVERSE_COLLECTION_NAME,   // the UNIVERSE collection
+            "localField": "universe_id",        // field in SERVER
+            "foreignField": "_id",              // field in UNIVERSE
+            "as": "universe"
+        }},
+            doc! { "$unwind": "$universe" }         // flatten the array
+        ];
+
+        let mut cursor = db_client
+            .database(RPBOT_DB_NAME)
+            .collection::<Server>(SERVER_COLLECTION_NAME)
+            .aggregate(pipeline)
+            .await?;
+
+
+        if let Some(doc) = cursor.try_next().await? {
+            // Extract the joined universe document
+            let universe_doc = doc.get_document("universe").unwrap();
+            let universe: Universe = from_document(universe_doc.clone())?;
+            return Ok(Some(universe));
+        }
+
+        Ok(None)
     }
+
 
     /// Inserts the current `Universe` instance into MongoDB.
     ///
@@ -106,7 +129,7 @@ impl Universe {
     ///
     /// # Returns
     /// A `Vec<Universe>` of universes owned by the user.
-    pub async fn get_universe_creator(user_id: u64) -> Vec<Universe> {
+    pub async fn get_creator_universes(user_id: u64) -> Vec<Universe> {
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         let filter = doc! { "creator_id": user_id.to_string() };
         db_client
@@ -115,6 +138,18 @@ impl Universe {
             .find(filter)
             .await
             .unwrap().try_collect().await.unwrap()
+    }
+
+    pub async fn check_universe_limit(user_id: u64) -> Result<bool, Error> {
+        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+        let filter = doc! { "creator_id": user_id.to_string() };
+        let result  = db_client
+            .database(RPBOT_DB_NAME)
+            .collection::<Universe>(UNIVERSE_COLLECTION_NAME)
+            .count_documents(filter)
+            .await?;
+
+        Ok(result <= FREE_LIMIT_UNIVERSE as u64)
     }
 
     /// Adds a server to this universe.
@@ -130,18 +165,17 @@ impl Universe {
     /// `UpdateResult` of the update operation.
     pub async fn add_server_to_universe(
         &self,
-        server_id: u64,
-    ) -> mongodb::error::Result<UpdateResult> {
+        mut server: Server,
+    ) -> mongodb::error::Result<InsertOneResult> {
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
-        let filter = doc! { "_id": self.universe_id };
-        let data_to_insert = doc! {"$addToSet": { "server_ids": server_id.to_string()}};
+
+        let serv = server.universe_id(self.universe_id);
+
         db_client
             .database(RPBOT_DB_NAME)
-            .collection::<Universe>(UNIVERSE_COLLECTION_NAME)
-            .update_one(filter, data_to_insert)
+            .collection::<Server>(SERVER_COLLECTION_NAME)
+            .insert_one(serv)
             .await
-        
-        //TODO insérer le serveur dans la base de données de l'univers
     }
 
     /// Retrieves a universe by its ObjectId.
@@ -152,7 +186,7 @@ impl Universe {
     /// * `universe_id` - String representation of ObjectId.
     ///
     /// # Returns
-    /// `Option<Universe>` if found, or `None`.
+    /// `Option<Universe>` if found, or `None`.erver
     pub async fn get_universe_by_id(
         universe_id: String,
     ) -> mongodb::error::Result<Option<Universe>> {
@@ -166,23 +200,15 @@ impl Universe {
             .await
     }
 
-    /// Generates a unique database name for this universe.
-    #[allow(unused)]
-    pub fn get_universe_database_name(&self) -> String{
-        format!("{}_{}",self.name, self.universe_id)
-    }
-
     /// Creates a deep clone of the current `Universe`.
     #[allow(unused)]
     pub fn clone(&self) -> Self {
         Self {
             universe_id: self.universe_id.clone(),
-            server_ids: self.server_ids.clone(),
             name: self.name.clone(),
             creator_id: self.creator_id.clone(),
             global_time_modifier: self.global_time_modifier.clone(),
             creation_timestamp: self.creation_timestamp.clone(),
-            default_locale: self.default_locale.clone(),
         }
     }
 
@@ -200,6 +226,67 @@ impl Universe {
             }
             Err(_) => { Err("check_universe_ownership__universe_not_found".to_string()) }
         }
+    }
+
+    pub async fn delete(&self) -> Result<&str, Error> {
+        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+        let filter_universe = doc! { "_id": self.universe_id};
+        let filter_server = doc!{"universe_id": self.universe_id};
+
+        let drop_db = db_client
+            .database(self.universe_id.to_string().as_str());
+
+        let delete_universe = db_client
+            .database(RPBOT_DB_NAME)
+            .collection::<Universe>(UNIVERSE_COLLECTION_NAME);
+
+        let delete_servers = db_client
+            .database(RPBOT_DB_NAME)
+            .collection::<Server>(SERVER_COLLECTION_NAME)
+            ;
+
+        let (db_drop_result, universe_delete, server_delete) = join!(drop_db.drop(), delete_universe.delete_one(filter_universe), delete_servers.delete_one(filter_server));
+        if db_drop_result.is_err() || universe_delete.is_err() || server_delete.is_err(){
+            return Err("universe_delete__failed".into());
+        }
+        Ok("universe_delete__passed")
+    }
+
+
+    pub async fn setup_constraints(&self) -> mongodb::error::Result<CreateIndexResult> {
+        let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }) .await .clone();
+        let index_keys = doc! {"name": 1};
+        let index_options = IndexOptions::builder().unique(true).build();
+        let index_model = IndexModel::builder()
+            .keys(index_keys)
+            .options(index_options)
+            .build();
+        db_client
+            .database(self.universe_id.to_string().as_str())
+            .collection::<Stat>(STATS_COLLECTION_NAME)
+            .create_index(index_model)
+            .await
+    }
+
+    pub async fn check_server_limit(self) -> Result<bool, &'static str> {
+        let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }) .await .clone();
+        let filter = doc!{"universe_id": self.universe_id};
+        let servers_result_request = db_client
+            .database(RPBOT_DB_NAME)
+            .collection::<Server>(SERVER_COLLECTION_NAME)
+            .count_documents(filter)
+            .await;
+
+        match servers_result_request {
+            Ok(server_count) => {
+                if server_count >= FREE_LIMIT_UNIVERSE as u64 {
+                    return Ok(false)
+                }
+            }
+            Err(_) => { return Err("universe__check_server_limit_failed".into()) }
+        }
+
+        Ok(true)
     }
 }
 
@@ -222,7 +309,6 @@ mod test {
         let _ = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await;
         let universe = Universe {
             universe_id: Default::default(),
-            server_ids: vec![SERVER_ID],
             name: "test".to_string(),
             creator_id: 0,
             global_time_modifier: 100,
@@ -230,7 +316,6 @@ mod test {
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
                 .as_millis(),
-            default_locale: "".to_string(),
         };
         match universe.insert_universe().await {
             Ok(universe) => Ok(universe),
@@ -302,7 +387,7 @@ mod test {
     #[tokio::test]
     async fn test_recover_universe_by_creator_id() {
         let _ = insert_universe().await;
-        let result = Universe::get_universe_creator(0).await;
+        let result = Universe::get_creator_universes(0).await;
         delete_previously_setup().await;
         if result.is_empty(){
             println!("no universes found");
@@ -338,7 +423,7 @@ mod test {
     #[tokio::test]
     async fn test_recover_unexisting_universe_by_id() {
         let _ = insert_universe().await;
-        let result = Universe::get_universe_creator(1).await;
+        let result = Universe::get_creator_universes(1).await;
         if !result.is_empty(){
             println!("universes found {:?}", result);
             assert!(false)

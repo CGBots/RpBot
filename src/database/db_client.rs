@@ -20,8 +20,13 @@
 //! ```
 #![allow(unused_doc_comments)]
 use std::env;
+use mongodb::bson::doc;
+use mongodb::IndexModel;
+use mongodb::options::IndexOptions;
 use tokio::sync::OnceCell;
 use urlencoding::encode;
+use crate::database::db_namespace::{RPBOT_DB_NAME, SERVER_COLLECTION_NAME};
+use crate::database::server::Server;
 
 /// Connects to MongoDB and returns a client.
 ///
@@ -41,6 +46,21 @@ pub async fn connect_db() -> Result<mongodb::Client, mongodb::error::Error> {
     let password = encode(&password);
     let url = format!("mongodb://{user}:{password}@localhost:27017/?authSource=admin");
     mongodb::Client::with_uri_str(url).await
+}
+
+pub async fn constraint(){
+    let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }) .await .clone();
+    let index_keys = doc! {"server_id": 1};
+    let index_options = IndexOptions::builder().unique(true).build();
+    let index_model = IndexModel::builder()
+        .keys(index_keys)
+        .options(index_options)
+        .build();
+    let result_server_index = db_client
+        .database(RPBOT_DB_NAME)
+        .collection::<Server>(SERVER_COLLECTION_NAME)
+        .create_index(index_model)
+        .await;
 }
 
 /// Lazily initialized, thread-safe global MongoDB client.

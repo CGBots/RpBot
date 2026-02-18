@@ -134,7 +134,7 @@ pub fn get_rp_character_permission_set(player_role_id: RoleId) -> Vec<Permission
 /// - The bot lacks permissions to create channels
 /// - The guild ID is not available in the context
 /// - The API request fails
-pub async fn create_channel(ctx: Context<'_>, channel_name: String, channel_type: ChannelType, position: u16, permissions: Vec<PermissionOverwrite>, category: Option<u64>) -> serenity::Result<GuildChannel> {
+pub async fn create_channel(ctx: &Context<'_>, channel_name: String, channel_type: ChannelType, position: u16, permissions: Vec<PermissionOverwrite>, category: Option<u64>) -> serenity::Result<GuildChannel> {
     let mut channel = CreateChannel::new(channel_name)
         .kind(channel_type)
         .position(position)

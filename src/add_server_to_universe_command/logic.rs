@@ -5,7 +5,6 @@
 //! it to a new one. These functions interact with the database layer defined
 //! in [`crate::database::universe::Universe`].
 
-use crate::database::server::Server;
 use crate::database::universe::Universe;
 
 /// Checks whether a Discord guild (server) is already bound to an existing universe.
@@ -45,60 +44,4 @@ pub async fn check_server_in_universe(guild_id: u64) -> Result<Universe, String>
         }
     }
     Err(format!("Guild {} not bind to any existing universe", guild_id))
-}
-
-/// Links a Discord guild (server) to a specific universe.
-///
-/// This function fetches the [`Universe`] identified by the provided `universe` ID,
-/// and then updates it to include the given `guild_id` as a linked server.
-/// It also creates a corresponding [`Server`] document in the universe-specific database.
-///
-/// # Arguments
-///
-/// * `universe` - The unique string ID of the universe to link the guild to.
-/// * `guild_id` - The Discord ID of the guild to associate with the universe.
-///
-/// # Returns
-///
-/// * `Ok(Universe)` - The updated [`Universe`] object after linking.
-/// * `Err(String)` - If the operation fails at any point.
-///
-/// # Errors
-///
-/// Returns an `Err(String)` when:
-/// - The universe ID does not exist.
-/// - The database update fails.
-/// - An internal `.unwrap()` fails (note: current implementation could panic).
-///
-/// # Panics
-///
-/// This function currently uses several `.unwrap()` calls on database operations.
-/// These should be replaced by proper error handling to avoid panics in production.
-///
-/// # Example
-///
-/// ```ignore
-/// let universe = "universe_42".to_string();
-/// let guild_id = 987654321098765432;
-///
-/// match add_server_to_universe(universe, guild_id).await {
-///     Ok(updated_universe) => println!("Guild linked to {}", updated_universe.name),
-///     Err(err) => eprintln!("Failed to link guild: {}", err),
-/// }
-/// ```
-pub async fn add_server_to_universe(universe: String, guild_id: u64) -> Result<Universe, String> {
-    let universe = Universe::get_universe_by_id(universe)
-        .await
-        .unwrap()
-        .unwrap();
-
-    let _result = universe.add_server_to_universe(guild_id)
-        .await;
-
-    let mut server = Server::default();
-    server.universe_id = universe.universe_id;
-    server.server_id = guild_id;
-    server.insert_server(universe.universe_id.to_string().as_str()).await.unwrap();
-    
-    Ok(universe)
 }

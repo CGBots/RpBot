@@ -4,105 +4,195 @@ support = contact.cgbots@gmail.com
 
 ping = ping
     .description = permet de ping le bot et d'avoir le délai d'envoi
-
-create_universe = nouvel_univers
-    .description = Permet de créer un nouvel univers. Un serveur ne peut être rattaché qu'à un univers à la fois.
-    .universe_name = nom
-    .universe_name-description = Nom du nouvel Univers
-    .setup_type = {setup.setup_type}
-    .setup_type-description = {setup.setup_type-description}
     
 start = start
     .description = Affiche les instruction de démarrage dans le salon actuel.
 
+#Stats
+stat_insert__failed = Échec de l'insertion des statistiques
+
+#Reply
+reply__reply_failed = Échec de l'envoi de la réponse
+
+#Universe
 universe = univers
     .description = univers
+check_universe_ownership__universe_not_found = Univers introuvable
+    .title = Univers introuvable
+    .mesage = L'univers spécifié n'a pas été trouvé
+universe_delete__failed = Échec de la suppression de l'univers
+universe_delete__passed = Univers supprimé avec succès
+universe__check_server_limit_failed = Échec de la vérification de la limite de serveurs
+    .title = Erreur de vérification
+    .message = Impossible de vérifier la limite de serveurs pour cet univers
 
-admin_role_name = Admin
-moderator_role_name = Moderateur
-spectator_role_name = Spectateur
-player_role_name = Joueur
+#Create universe
+create_universe = nouvel_univers
+    .description = Permet de créer un nouvel univers. Un serveur ne peut être rattaché qu'à un univers à la fois.
+    .universe_name = nom
+    .universe_name-description = Nom du nouvel Univers
+    .setup_type = setup_type
+    .setup_type-description = Type de configuration pour ce serveur
+create_universe__check_universe_limit_failed = Échec de la vérification de la limite d'univers
+    .title = Erreur de vérification
+    .message = Impossible de vérifier la limite d'univers
+create_universe__universe_limit_reached = Limite d'univers atteinte
+    .title = Limite atteinte
+    .message = Vous avez atteint le nombre maximum d'univers autorisés
+create_universe__get_server_failed = Échec de la récupération du serveur
+    .title = Erreur serveur
+    .message = Impossible de récupérer les informations du serveur
+create_universe__already_exist_for_this_server = Un univers existe déjà pour ce serveur
+    .title = Univers existant
+    .message = Ce serveur est déjà lié à un univers
+create_universe__setup_constraints_failed = Échec de la vérification des contraintes de configuration
+    .title = Erreur de contraintes
+    .message = Les contraintes de configuration n'ont pas pu être vérifiées
+create_universe__server_insert_failed = Échec de l'insertion du serveur
+    .title = Erreur d'insertion
+    .message = Impossible d'insérer le serveur dans la base de données
+create_universe__universe_insert_failed = Échec de l'insertion de l'univers
+    .title = Erreur de création
+    .message = Impossible de créer l'univers dans la base de données
+create_universe__speed_stat_insert_failed = Échec de l'insertion des statistiques de vitesse
+    .title = Erreur de statistiques
+    .message = Impossible d'insérer les statistiques de vitesse
+create_universe__universe_successfully_created = Univers créé avec succès
+    .title = Succès
+    .message = Votre nouvel univers a été créé avec succès
 
-road_channel_name = Routes
+#Add server to universe
+add_server_to_universe__already_bind = Serveur déjà lié à un univers
+    .title = Serveur déjà lié
+    .message = Ce serveur est déjà rattaché à un univers
+add_server_to_universe__universes_unavailable = Aucun univers disponible
+    .title = Univers indisponibles
+    .message = Aucun univers n'est disponible pour ce serveur
+choose_universe =
+    exceed_limit_number_of_servers_per_universe = Limite de serveurs par univers dépassée
+    .title = Limite dépassée
+    .message = Le nombre maximum de serveurs pour cet univers a été atteint
+add_server_to_universe__guild_linked = Serveur lié à l'univers
+    .title = Serveur lié
+    .message = Le serveur a été lié à l'univers avec succès
 
+#Server
+id__nothing_to_delete = Rien à supprimer
+    .title = Rien à supprimer
+    .message = Aucun élément à supprimer n'a été trouvé
+id__role_delete_success = Rôle supprimé avec succès
+    .title = Suppression réussie
+    .message = Le rôle a été supprimé avec succès
+id__role_delete_failed = Échec de la suppression du rôle
+    .title = Erreur de suppression
+    .message = Impossible de supprimer le rôle
+id__channel_delete_sucess = Salon supprimé avec succès
+    .title = Suppression réussie
+    .message = Le salon a été supprimé avec succès
+id__channel_delete_failed = Échec de la suppression du salon
+    .title = Erreur de suppression
+    .message = Impossible de supprimer le salon
 
-admin_category_name = Administration
-setup__admin_category_not_created = La catégorie {$admin_category_name} n'a pas pu être créée.
-nrp_category_name = Hors RP
-setup__nrp_category_not_created = La catégorie {$nrp_category_name} n'a pas pu être créée.
-rp_category_name = RolePlay
-setup__rp_category_not_created = La catégorie {$rp_category_name} n'a pas pu être créée.
-log_channel_name = Logs
-setup__log_channel_not_created = Le salon {$log_channel_name} n'a pas pu être créé.
-commands_channel_name = Commandes
-setup__commands_channel_not_created = Le salon {$commands_channel_name} n'a pas pu être créé.
-moderation_channel_name = Modération
-setup__moderation_channel_not_created = Le salon {$moderation_channel_name} n'a pas pu être créé.
-nrp_general_channel_name = Général
-setup__nrp_general_channel_not_created = Le salon {$nrp_general_channel_name} n'a pas pu être créé.
-rp_character_channel_name = Fiches personnage
-setup__rp_character_channel_not_created = Le salon {$rp_character_channel_name} n'a pas pu être créé.
-rp_wiki_channel_name = Wiki
-setup__wiki_channel_not_created = Le salon {$rp_wiki_channel_name} n'a pas pu être créé.
-
-
-setup = setup
-    .description = Permet de créer les salons nécessaires au fonctionnement du bot.
-    .setup_type = type
-    .setup_type-description = Setup complet -> admin, création des personnages, wiki. Minimal -> nécessaire au bon fonctionnement.
-
+#Setup
 FullSetup = Complet
 PartialSetup = Partiel
-
 cancel_setup = Annuler
-continue_setup = Continuer
-
-continue_setup_message = Le serveur semble déjà configuré. Les éléments manquants seront créés.
-
-setup__server_not_found = Le serveur ne semble pas être enregistré auprès du bot. Contactez le support à {$support}
-setup__server_already_setup_timeout = Le délai de sélection est écoulé.
-setup__canceled = La configuration a été annulée.
-setup__admin_role_not_created = Le rôle {$admin_role_name} n'a pas pu être créé.
-setup__moderator_role_not_created = Le rôle {$moderator_role_name} n'a pas pu être créé.
-setup__spectator_role_not_created = Le rôle {$spectator_role_name} n'a pas pu être créé.
-setup__player_role_not_created = Le rôle {$player_role_name} n'a pas pu être créé.
-setup__reorder_went_wrong = La réorganisation des rôles a échoué. Vérifiez que les rôles sont organisés comme suit : RpBot > {$admin_role_name} > {$moderator_role_name} > {$spectator_role_name} > {$player_role_name}
-setup__road_category_not_created = La catégorie des routes n'a pas pu être créée.
-setup__server_update_failed = L'enregistrement des informations liées au serveur a échoué.
-setup__universe_not_found = Le serveur n'est associé à aucun univers.
-setup__setup_success_message = La configuration s'est terminée avec succès.
-setup__setup_success_title = Configuration terminée.
-setup__setup_error_message = Les erreurs suivantes ont été détectées :
-    {$errors}
-
-    Merci de vérifier les droits du bot. Il doit être administrateur.
-setup__setup_error_title = Erreur lors de l'initialisation du serveur.
-
-
-
-
-
-already_exist_for_this_server = Ce serveur fait déjà partie d'un univers.
-
-exceed_limit_number_of_servers_per_universe = Vous avez atteint la limite maximale de serveurs pour cet univers.
-    Pour augmenter la limite, merci de passer à un abonnement supérieur.
-
-universes_unavailable = Vous n'avez pas encore créé d'univers ou ils sont indisponibles.
-
-not-in-guild-error = Cette commande ne peut être effectuée que dans un serveur.
-
-already_bind = Ce serveur est déjà lié à un univers.
-
-guild_linked = Le serveur fait maintenant partie de l'univers ***{$universe_name}***.
-
-choose_universe = Choisissez l'univers dans la liste ci-dessous.
-
-exceed_limit_number_of_universes = Vous avez atteint la limite maximale d'univers que vous pouvez créer.
-
-universe_created = L'univers {$universe_name} a bien été créé. Les rôles et les catégories sont en cour de création.
-
-start_message = Merci d'avoir choisi RpBot pour administrer votre serveur RP.
-    La première étape consiste à créer un univers : `/{$create_universe}`
-    Ensuite, vous devrez configurer les rôles et salons nécessaires : `/{$setup}`
-    Une fois ceci fait, vous pourrez créer vos premiers lieux : `/`
-    Puis vos premières routes : `/`
+continue_setup = Continuer 
+setup__continue_setup_message = Continuer la configuration ?
+    .title = Continuer la configuration
+    .message = Voulez-vous continuer la configuration malgré un précédent setup ?  Les salon et rôles inexistants seront créés.
+setup__server_already_setup_timeout = Délai de configuration dépassé
+    .title = Délai dépassé
+    .message = Le délai pour continuer la configuration a expiré
+setup_server__cancelled = Configuration annulée
+    .title = Configuration annulée
+    .message = La configuration du serveur a été annulée
+setup_server__success = Configuration réussie
+    .title = Succès
+    .message = Le serveur a été configuré avec succès
+setup_server__failed = Échec de la configuration
+    .title = Erreur
+    .message = La configuration du serveur a échoué
+setup__full_setup_success = Configuration complète réussie
+    .title = Configuration terminée
+    .message = La configuration complète du serveur a été effectuée avec succès
+admin_category_name = Administration
+    .title = Administration
+    .message = Catégorie d'administration
+setup__admin_category_not_created = Catégorie d'administration non créée
+    .title = Erreur de création
+    .message = Impossible de créer la catégorie d'administration
+nrp_category_name = Hors RP
+setup__nrp_category_not_created = Catégorie Hors RP non créée
+    .title = Erreur de création
+    .message = Impossible de créer la catégorie Hors RP
+rp_category_name = RP
+setup__rp_category_not_created = Catégorie RP non créée
+    .title = Erreur de création
+    .message = Impossible de créer la catégorie RP
+setup__roles_setup_failed = Échec de la configuration des rôles
+    .title = Erreur de configuration
+    .message = La configuration des rôles a échoué
+log_channel_name = Logs
+setup__log_channel_not_created = Salon de logs non créé
+    .title = Erreur de création
+    .message = Impossible de créer le salon de logs
+commands_channel_name = Commandes
+setup__commands_channel_not_created = Salon de commandes non créé
+    .title = Erreur de création
+    .message = Impossible de créer le salon de commandes
+moderation_channel_name = Moderation
+setup__moderation_channel_not_created = Salon de modération non créé
+    .title = Erreur de création
+    .message = Impossible de créer le salon de modération
+nrp_general_channel_name = General
+setup__nrp_general_channel_not_created = Salon général Hors RP non créé
+    .title = Erreur de création
+    .message = Impossible de créer le salon général Hors RP
+rp_character_channel_name = Fiches personnages
+setup__rp_character_channel_not_created = Salon de fiches personnages non créé
+    .title = Erreur de création
+    .message = Impossible de créer le salon de fiches personnages
+rp_wiki_channel_name = Wiki
+setup__wiki_channel_not_created = Salon wiki non créé
+    .title = Erreur de création
+    .message = Impossible de créer le salon wiki
+setup__rollback_failed = Échec de l'annulation des modifications
+    .title = Erreur d'annulation
+    .message = Impossible d'annuler les modifications effectuées
+setup__channel_setup_failed = Échec de la configuration des salons
+    .title = Erreur de configuration
+    .message = La configuration des salons a échoué
+guild_only = Commande réservée aux serveurs.
+admin_role_name = Administrateur
+setup__admin_role_not_created = Rôle Administrateur non créé
+    .title = Erreur de création
+    .message = Impossible de créer le rôle Administrateur
+moderator_role_name = Modérateur
+setup__moderator_role_not_created = Rôle Modérateur non créé
+    .title = Erreur de création
+    .message = Impossible de créer le rôle Modérateur
+spectator_role_name = Spectateur
+setup__spectator_role_not_created = Rôle Spectateur non créé
+    .title = Erreur de création
+    .message = Impossible de créer le rôle Spectateur
+player_role_name = Joueur
+setup__player_role_not_created = Rôle Joueur non créé
+    .title = Erreur de création
+    .message = Impossible de créer le rôle Joueur
+setup__error_during_role_creation = Erreur lors de la création des rôles
+    .title = Erreur de création
+    .message = Une erreur s'est produite lors de la création des rôles
+setup__reorder_went_wrong = Erreur lors du réordonnancement
+    .title = Erreur de réordonnancement
+    .message = Une erreur s'est produite lors du réordonnancement des rôles
+road_channel_name = Routes
+setup__road_category_not_created = Catégorie Routes non créée
+    .title = Erreur de création
+    .message = Impossible de créer la catégorie Routes
+setup__server_update_failed = Échec de la mise à jour du serveur
+    .title = Erreur de mise à jour
+    .message = Impossible de mettre à jour les informations du serveur
+setup__setup_success_message = Configuration terminée avec succès
+    .title = Succès
+    .message = La configuration a été effectuée avec succès

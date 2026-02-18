@@ -11,13 +11,11 @@ use serenity::all::GatewayIntents;
 use serenity::Client;
 use serenity::client::ClientBuilder;
 use crate::{translation};
-use crate::add_server_to_universe_command::handler::add_server;
-use crate::create_universe_command::handler::{create_universe, universe};
+use crate::create_universe_command::handler::{universe};
 use crate::discord::handler::Handler;
 use crate::ping_command::handler::ping;
 use crate::start_command::handler::start;
 use crate::discord::poise_structs::Data;
-use crate::setup_command::handler::setup;
 
 #[cfg(not(test))]
 static SHARD_NUMBER: u32 = 1;
