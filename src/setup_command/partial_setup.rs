@@ -1,10 +1,3 @@
-//! Partial setup functionality for Discord server configuration.
-//!
-//! This module provides functionality to perform a partial setup of a Discord server,
-//! creating essential roles and channels needed for the bot to function properly.
-//! It handles role creation, permission ordering, and category setup while maintaining
-//! rollback capabilities in case of errors.
-
 use serenity::all::{ChannelType, Role, RoleId};
 use crate::database::server::{Id, IdType, Server};
 use crate::database::server::IdType::Category;
@@ -13,61 +6,61 @@ use crate::discord::poise_structs::{Context, Error};
 use crate::discord::roles::{create_role, edit_role_positions, AdminRolePermissions, ModeratorRolePermissions, PlayerRolePermissions, SpectatorRolePermissions};
 use crate::tr;
 
-/// Performs a partial setup of the Discord server by creating essential roles and channels.
+/// Performs a partial setup for a Discord server using the provided context and server configuration.
 ///
-/// This function creates or verifies the existence of four key roles (Admin, Moderator, Spectator, Player)
-/// and a roads category channel. It also properly orders the roles in the guild hierarchy.
-/// If any step fails, the function attempts to rollback all changes made during the setup process.
+/// This asynchronous function sets up roles and channels for the server, ensuring proper configurations
+/// for roles such as `Admin`, `Moderator`, `Spectator`, and `Player`. It also adjusts role positions
+/// and creates a category channel for organizing related resources. If any setup step fails, the setup
+/// is rolled back to maintain the integrity of the server state.
 ///
 /// # Arguments
 ///
-/// * `ctx` - The Discord context containing guild and HTTP information
-/// * `server` - A mutable reference to the server configuration that will be updated with new role and channel IDs
+/// * `ctx` - The contextual object that provides access to the Discord API and tools for interacting
+///   with the server.
+/// * `server` - A mutable reference to the `Server` object representing the current state of the
+///   server. It is updated during the setup process to reflect the new configuration.
+/// * `snapshot` - A snapshot of the server's state before any changes have been made, used for
+///   rollback if an error occurs.
 ///
 /// # Returns
 ///
-/// * `Ok((message_key, created_roles, created_channels))` - On success, returns:
-///   - A translation key for the success message
-///   - A vector of newly created roles
-///   - A vector of newly created channels (currently only the roads category)
-/// * `Err(error_keys)` - On failure, returns a vector of translation keys describing the errors that occurred
-///
-/// # Behavior
-///
-/// 1. Checks if roles already exist in the database and on Discord, creates them if needed
-/// 2. Reorders roles in the guild hierarchy: Bot > Admin > Moderator > Spectator > Player
-/// 3. Creates or verifies the roads category channel with appropriate permissions
-/// 4. Updates the server database record with new role and channel IDs
-/// 5. Attempts to rollback (delete) all created resources if any step fails
+/// * `Ok(&'a str)` - A success message indicating that the setup completed successfully.
+/// * `Err(Error)` - An error message describing the issue that occurred during setup.
 ///
 /// # Errors
 ///
-/// Returns error translation keys for various failure scenarios:
-/// - `setup__admin_role_not_created` - Failed to create admin role
-/// - `setup__moderator_role_not_created` - Failed to create moderator role
-/// - `setup__spectator_role_not_created` - Failed to create spectator role
-/// - `setup__player_role_not_created` - Failed to create player role
-/// - `setup__rollback_failed` - Failed to rollback changes after an error
-/// - `setup__reorder_went_wrong` - Failed to reorder roles in hierarchy
-/// - `setup__road_category_not_created` - Failed to create roads category
-/// - `setup__server_update_failed` - Failed to save server configuration to database
+/// This function can return errors in a variety of scenarios:
+/// * `"guild_only"` - The function was called in a context not associated with a server.
+/// * `"partial_setup__get_guild_roles_error"` - Failed to retrieve existing guild roles from the API.
+/// * `"setup__admin_role_not_created"` - Failed to create or retrieve the `Admin` role.
+/// * `"setup__moderator_role_not_created"` - Failed to create or retrieve the `Moderator` role.
+/// * `"setup__spectator_role_not_created"` - Failed to create or retrieve the `Spectator` role.
+/// * `"setup__player_role_not_created"` - Failed to create or retrieve the `Player` role.
+/// * `"setup__error_during_role_creation"` - One or more roles failed to be created or retrieved.
+/// * `"setup__reorder_went_wrong"` - Failed to reorder the roles in the server.
+/// * `"setup__road_category_not_created"` - Failed to create or retrieve the category channel.
+/// * `"setup__server_update_failed"` - Failed to update the server configuration after setup.
 ///
-/// # Example
+/// # Rollback
 ///
-/// ```no_run
-/// # use crate::setup_command::partial_setup::partial_setup;
-/// # async fn example(ctx: Context<'_>, mut server: Server) {
-/// match partial_setup(ctx, &mut server).await {
-///     Ok((msg, roles, channels)) => {
-///         println!("Setup successful: {}", msg);
-///         println!("Created {} roles and {} channels", roles.len(), channels.len());
-///     }
-///     Err(errors) => {
-///         eprintln!("Setup failed with errors: {:?}", errors);
-///     }
+/// If any error occurs during the setup process, the server's state is rolled back to its initial
+/// configuration using the provided snapshot to prevent partial or inconsistent configurations.
+///
+/// # Example Usage
+///
+/// ```rust
+/// // Assuming `ctx`, `server`, and `snapshot` are available.
+/// match partial_setup(&ctx, &mut server, snapshot).await {
+///     Ok(success_message) => println!("{}", success_message),
+///     Err(e) => eprintln!("Setup failed: {}", e),
 /// }
-/// # }
 /// ```
+///
+/// # Notes
+///
+/// * This function is designed to operate within an asynchronous context.
+/// * It relies on helper functions such as `create_role`, `edit_role_positions`, and
+///   `create_channel` to manage server resources.
 pub async fn partial_setup<'a>(ctx: &Context<'_>, server: &mut Server, snapshot: Server) -> Result<&'a str, Error> {
     //everyone role
     let guild_id = ctx.guild_id().ok_or("guild_only")?;
@@ -77,12 +70,6 @@ pub async fn partial_setup<'a>(ctx: &Context<'_>, server: &mut Server, snapshot:
 
     let mut roles_created: Vec<Role> = vec![];
     let mut errors: Vec<&str> = vec![];
-
-    // Role creation pattern: First check if role ID exists in database.
-    // If it exists, verify it still exists on Discord by fetching it.
-    // If database has no ID or Discord fetch fails, create a new role.
-    // Track newly created roles in roles_created vector for potential rollback.
-    // This ensures idempotency - we don't recreate resources that already exist.
 
     let admin_role = async {
         if let Some(role_id) = server.clone().admin_role_id {
@@ -167,21 +154,17 @@ pub async fn partial_setup<'a>(ctx: &Context<'_>, server: &mut Server, snapshot:
         }
     }.await;
 
-
-    //verification que les rôles ont bien été créés
     if !errors.is_empty() {
         server.rollback(ctx, snapshot).await;
         return Err("setup__error_during_role_creation".into())
     }
 
-    //Unwrapping
     let admin_role = admin_role?;
     let moderator_role = moderator_role?;
     let spectator_role = spectator_role?;
     let player_role = player_role?;
     let everyone_role = everyone_role;
 
-    //Reordering roles
     let guild_id = ctx.guild_id().unwrap();
     let bot_id = ctx.cache().current_user().id;
     let bot_member = guild_id
@@ -190,8 +173,7 @@ pub async fn partial_setup<'a>(ctx: &Context<'_>, server: &mut Server, snapshot:
     let bot_role = bot_member.roles.clone()[0];
 
     let mut roles_pos: Vec<(RoleId, Option<u64>)> = vec![(admin_role.id, Some(4)), (moderator_role.id, Some(3)), (spectator_role.id, Some(2)), (player_role.id, Some(1)), (bot_role, Some(5))];
-    
-    // Add existing roles with higher positions to roles_pos without changing their positions
+
     for role in &existing_roles {
         if role.id != everyone_role {
             roles_pos.push((role.id, Some((role.position + existing_roles.len() as u16).into())));
@@ -203,20 +185,12 @@ pub async fn partial_setup<'a>(ctx: &Context<'_>, server: &mut Server, snapshot:
     match res {
         Ok(_) => {}
         Err(e) => {
-            println!("{:?}", e);
-            // Rollback on role reordering failure: delete all newly created roles.
-            // Best-effort cleanup - log errors but don't propagate deletion failures.
             server.rollback(ctx, snapshot).await;
             return Err("setup__reorder_went_wrong".into())}
     }
 
     let permissions = get_road_category_permission_set(everyone_role, player_role.id, spectator_role.id, moderator_role.id);
 
-    // Tricky Result wrapper inversion: Existing channels are wrapped in Ok(), new channels in Err().
-    // This allows us to distinguish between "found existing channel" vs "need to create new channel".
-    // When we find an existing channel, we wrap it in Ok(channel).
-    // When we need to create a channel, we wrap the create_channel result in Err().
-    // The outer type is Result<Channel, Result<Channel, Error>>, enabling tracking via road_created flag.
     let result_road_category = match server.clone().road_category_id {
         None => { Err(create_channel(ctx, tr!(*ctx, "road_channel_name"), ChannelType::Category, 0, permissions, None).await) }
         Some(channel_id) => {
@@ -227,10 +201,6 @@ pub async fn partial_setup<'a>(ctx: &Context<'_>, server: &mut Server, snapshot:
             }
         }
     };
-
-    // Track whether the road category was newly created (vs already existing).
-    // This flag is critical for rollback: we only delete newly created resources on failure.
-    // Existing resources that were found should never be deleted during rollback.
 
     let road_category = match result_road_category {
         Ok(channel) => {channel.guild().unwrap()}
@@ -254,11 +224,6 @@ pub async fn partial_setup<'a>(ctx: &Context<'_>, server: &mut Server, snapshot:
     let update_result = server.update().await;
 
     if update_result.is_err() {
-        // Final rollback point: If database update fails, cleanup all Discord resources created in this run.
-        // Delete all newly created roles (tracked in roles_created vector).
-        // Delete road category only if road_created flag is true (meaning we created it, not found existing).
-        // This prevents orphaned Discord resources when database is out of sync.
-        // Best-effort cleanup - we log individual deletion failures but don't fail the rollback.
         server.rollback(ctx, snapshot).await;
         return Err("setup__server_update_failed".into());
     };

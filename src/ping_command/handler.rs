@@ -1,37 +1,25 @@
-//! Handler for the `/ping` slash command.
-//!
-//! This command is used to check the bot’s responsiveness and latency.
-//! It replies with a “Pong!” message and the measured latency in milliseconds.
-//!
-//! # Example
-//! ```text
-//! /ping
-//! → Pong! 123ms
-//! ```
-//!
-//! # Module Overview
-//! - Defines the [`ping`] command handler.
-//! - Uses [`PingCommandData`](crate::ping_command::ping_data::PingCommandData)
-//!   to compute the latency since command invocation.
 use crate::ping_command::ping_data;
 use crate::discord::poise_structs::*;
 
-/// Responds with the bot's latency to confirm it is online and responsive.
-///
-/// This slash command measures the elapsed time between the interaction creation
-/// and the bot’s response, providing a simple latency check.
+/// Responds to a "ping" command with "Pong!" and the latency in milliseconds.
 ///
 /// # Arguments
-/// * `ctx` - The command context provided by the Poise framework.
+/// * `ctx` - The command context, which provides access to information about the command execution, such as the message and invoking user.
+///
+/// # Returns
+/// * `Result<(), Error>` - Returns `Ok(())` if the response message is successfully sent. Returns an `Error` if there is an issue during execution.
+///
+/// # Behavior
+/// * Calculates the latency between the command's creation time and the current time in milliseconds.
+/// * Sends a message in the channel where the command was invoked, containing "Pong!" followed by the computed latency.
+/// * Logs an error to the console if there is a failure in sending the message.
 ///
 /// # Example
-/// ```ignore
-/// /ping
-/// → Pong! 87ms
+/// User sends a `/ping` command:
 /// ```
-///
-/// # Errors
-/// Returns an error if the bot fails to send a reply message to Discord.
+/// User: /ping
+/// Bot: Pong! 123ms
+/// ```
 #[poise::command(slash_command)]
 pub async fn ping(
     ctx: Context<'_>

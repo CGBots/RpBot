@@ -3,6 +3,55 @@ use poise::{CreateReply};
 use serenity::all::{Color, CreateEmbed, CreateEmbedFooter};
 use crate::discord::poise_structs::{Context, Error};
 
+/// Sends an embed-based reply to a user based on the result provided, with appropriate styling
+/// (green for success and red for failure) and localized content.
+///
+/// # Parameters
+/// - `ctx`: The context of the interaction, which provides necessary metadata such as the guild ID
+///   and functionality for sending replies.
+/// - `result`: A `Result` containing either a success message (`Ok`) or an error (`Err`) to be
+///   used for constructing the reply embed.
+///
+/// # Returns
+/// - On success, returns `Ok("reply__reply_success")`.
+/// - On failure, returns `Err("reply__reply_failed")`.
+///
+/// # Behavior
+/// 1. The function determines the outcome (`Ok` or `Err`) from the `result` parameter and extracts 
+///    the corresponding message. Based on the result:
+///    - A success case generates a green embed with the success message.
+///    - A failure case generates a red embed with the error message.
+/// 2. The embed includes:
+///    - A localized title (`title`) and message (`message`) retrieved using the 
+///      `crate::translation::get` function.
+///    - A footer that displays the original string message.
+///    - A color indicating the status (green for success, red for failure).
+/// 3. Attempts to send the constructed embed using the `ctx.send` function. If sending succeeds,
+///    the function returns `Ok("reply__reply_success")`.
+/// 4. Logs an error and returns `Err("reply__reply_failed")` when the sending fails. The log entry
+///    includes details about the server (`guild_id`) and the error message.
+///
+/// # Examples
+/// ```rust
+/// let ctx = /* some context */;
+/// let result: Result<&str, Error> = Ok("Operation successful");
+///
+/// let response = reply(ctx, result).await;
+/// match response {
+///     Ok(success_message) => println!("{}", success_message), // "reply__reply_success"
+///     Err(error_message) => println!("{}", error_message),   // "reply__reply_failed"
+/// }
+/// ```
+///
+/// # Errors
+/// - If the process of sending the reply via `ctx.send` fails, the function logs the issue and
+///   returns an appropriate error message wrapped in `Err`.
+///
+/// # Notes
+/// - The `crate::translation::get` function is used to fetch localized strings for the embed's
+///   title and description based on the message content. Ensure that the translation keys exist
+///   and are properly configured.
+/// - The embed's color uses RGB values to visually indicate success or failure.
 pub async fn reply<'a>(
     ctx: Context<'a>,
     result: Result<&'a str, Error>,

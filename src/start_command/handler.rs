@@ -1,30 +1,34 @@
-//! Handler for the `/start` slash command.
-//!
-//! This command sends a welcome or startup message to the user who
-//! invoked it. Typically used to introduce the bot or provide initial
-//! instructions.
-//!
-//! # Example
-//! ```text
-//! /start
-//! → Welcome! Here’s how to use the bot...
-//! ```
-
 use poise::CreateReply;
 use crate::discord::poise_structs::{Context, Error};
 use crate::translation::tr;
 
-/// Sends a startup message to the user who invoked the `/start` command.
+/// Starts an administrator-only guild slash command.
+///
+/// This command sends a message defined by the "start_message" localization key to the channel
+/// where the command was invoked.
 ///
 /// # Arguments
-/// * `ctx` - The Poise command context, providing access to the Discord interaction
-///   and localization.
+/// * `ctx` - The command context providing access to the interaction data, including the guild, channel, and invoking user.
 ///
-/// # Permissions
-/// Requires the `ADMINISTRATOR` permission and must be executed in a guild.
+/// # Returns
+/// * `Result<(), Error>` - Returns `Ok(())` if the command executes successfully, or an `Error` otherwise.
 ///
-/// # Errors
-/// Returns an [`Error`] if the bot fails to send the reply message.
+/// # Attributes
+/// * `#[poise::command]` - Marks this function as a Poise command.
+///     - `slash_command` - Indicates this command is a slash command.
+///     - `required_permissions = "ADMINISTRATOR"` - Restricts the command to users with administrator permissions.
+///     - `guild_only` - Limits the command usage to guilds (servers) and prevents its usage in direct messages.
+///
+/// # Behavior
+/// * Sends a localized response ("start_message") defined by the `tr!` macro.
+/// * If the message cannot be sent (`await.unwrap()`), the program panics.
+///
+/// # Example
+/// ```
+/// // Example usage of the /start command inside a guild,
+/// // assuming the user has administrator permissions:
+/// /start
+/// ```
 #[poise::command(slash_command, required_permissions = "ADMINISTRATOR", guild_only)]
 pub async fn start(ctx: Context<'_>) -> Result<(), Error> {
     ctx.send(CreateReply::default().content(tr!(ctx, "start_message"))).await.unwrap();

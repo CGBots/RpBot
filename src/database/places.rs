@@ -1,3 +1,4 @@
+use serde_with::DisplayFromStr;
 use mongodb::bson::doc;
 use mongodb::bson::oid::ObjectId;
 use mongodb::results::InsertOneResult;
@@ -8,13 +9,16 @@ use crate::database::db_namespace::{PLACES_COLLECTION_NAME};
 use crate::database::modifiers::Modifier;
 
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Place{
     #[serde(rename = "_id")]
     pub _id: ObjectId,
     pub universe_id: ObjectId,
+    #[serde_as(as = "DisplayFromStr")]
     pub server_id: u64,
+    #[serde_as(as = "DisplayFromStr")]
     pub category_id: u64,
+    #[serde_as(as = "DisplayFromStr")]
     pub role: u64,
     pub name: String,
     pub modifiers: Vec<Modifier>,

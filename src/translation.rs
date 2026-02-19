@@ -1,6 +1,22 @@
-//! Provides a translation layer using Fluent for internationalization,
-//! with automatic fallback and macro-based access for Poise commands.
-
+//! Translation system for handling fluent (`.ftl`) resources and applying localized strings to commands.
+//!
+//! ## Overview
+//! This module provides tools for managing, formatting, and applying localized translations
+//! with Fluent. It supports concurrent memoization and fallback mechanisms, ensuring
+//! that translations can be fetched efficiently for a wide variety of locales.
+//!
+//! ## Key Components
+//! - [`Translations`]: Holds the main and locale-specific translation bundles.
+//! - `tr!`: A macro for convenient string translation with argument support.
+//! - [`format`]: Formats a Fluent message, resolving IDs, attributes, and arguments to a final string.
+//! - [`get`]: Retrieves a localized translation string, falling back gracefully if not found.
+//! - [`read_ftl`]: Loads `.ftl` translation files into memory.
+//! - [`apply_translations`]: Applies translations to structured command definitions.
+//! - [`smart_tr`]: Enriches translations by auto-resolving missing variables.
+//!
+//! ## Usage
+//! This module primarily supports applications where localization for commands and messaging is necessary,
+//! such as bots or internationalized software systems.
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::path::Path;
@@ -14,16 +30,104 @@ use regex::Regex;
 /// Type alias for a Fluent bundle with concurrent memoization
 type Bundle = FluentBundle<FluentResource, IntlLangMemoizer>;
 
-/// Holds all loaded translation bundles, including the default and locale-specific ones.
+/// A structure that holds translation bundles for managing multilingual support.
+///
+/// The `Translations` struct consists of a primary `main` bundle along
+/// with additional bundles stored in a key-value mapping for handling
+/// various languages and locales.
+///
+/// # Fields
+///
+/// * `main` -
+///   The primary [`Bundle`](crate::Bundle) used for translations. This bundle typically contains
+///   the default set of language translations or the primary locale.
+///
+/// * `other` -
+///   A collection of additional bundles stored in a [`HashMap`], where the key is a `String`
+///   representing the locale or language identifier (e.g., `en-US`, `fr`, `es`),
+///   and the value is a [`Bundle`](crate::Bundle) containing the corresponding localized translations.
+///
+/// # Examples
+///
+/// ```rust
+/// use std::collections::HashMap;
+/// use crate::Translations;
+///
+/// let main_bundle = Bundle::new();
+/// let mut other_bundles: HashMap<String, Bundle> = HashMap::new();
+/// other_bundles.insert("fr".to_string(), Bundle::new());
+///
+/// let translations = Translations {
+///     main: main_bundle,
+///     other: other_bundles,
+/// };
+///
+/// assert!(translations.other.contains_key("fr"));
+/// ```
 pub struct Translations {
     pub main: Bundle,
     pub other: HashMap<String, Bundle>,
 }
 
-/// Macro to retrieve a translation string, optionally with arguments.
-/// Usage:
-/// - `tr!(ctx, "identifier")`
-/// - `tr!(ctx, "identifier", arg1: VALUE1, arg2: VALUE2)`
+/// A macro for performing translations using Fluent-based argument substitution.
+///
+/// This macro provides a convenient way to localize strings based on an identifier (`$id`) and
+/// optional arguments. It supports Fluent-style parameterized localization, allowing users to pass
+/// key-value pairs for placeholders within the translation string. If a translation is not found
+/// or an error occurs, the macro defaults to returning the untranslated identifier (`$id`).
+///
+/// # Syntax
+/// ```
+/// tr!(context, id);
+/// tr!(context, id, argname: value, ...);
+/// ```
+///
+/// - When called with just `context` and `id`, it attempts to fetch the associated
+///   translation from the Fluent resources.
+/// - When called with additional arguments in the form `argname: value`, it substitutes
+///   placeholders in the translation with the specified values.
+///
+/// # Parameters
+///
+/// - `$ctx:expr`
+///   The translation context, typically a structure or object containing locale and Fluent resource
+///   configuration.
+///
+/// - `$id:expr`
+///   The identifier for the translation resource.
+///
+/// - `$argname:ident`
+///   (Optional) The name of a placeholder in the translation string.
+///
+/// - `$argvalue:expr`
+///   (Optional) The value for the given placeholder.
+///
+/// # Returns
+///
+/// Returns a `String` that contains the localized version of the input identifier with
+/// placeholders substituted. If the translation fails or the identifier is not found,
+/// the untranslated identifier (`$id`) is returned.
+///
+/// # Examples
+///
+/// Basic usage:
+/// ```rust
+/// let translation = tr!(context, "hello_world");
+/// assert_eq!(translation, "Hello, World!");
+/// ```
+///
+/// With arguments:
+/// ```rust
+/// let translation = tr!(context, "welcome_user", username: "Alice");
+/// assert_eq!(translation, "Welcome, Alice!");
+/// ```
+///
+/// Fallback to identifier if translation not found:
+/// ```
+/// let translation = tr!(context, "unknown_key");
+/// assert_eq!(translation, "unknown_key");
+/// ```
+
 #[macro_export]
 macro_rules! tr {
     ( $ctx:expr, $id:expr $(, $argname:ident: $argvalue:expr )* $(,)? ) => {{
@@ -39,7 +143,52 @@ macro_rules! tr {
 #[allow(unused_imports)]
 pub(crate) use tr;
 
-/// Formats a Fluent message with optional attribute and arguments.
+/// Formats a Fluent message or attribute into a localized string.
+///
+/// This function retrieves a message using its ID and optionally fetches
+/// an associated attribute if specified. It then formats the corresponding
+/// pattern using the provided arguments, if any, into a `String`.
+///
+/// # Parameters
+///
+/// - `bundle`: A reference to the `Bundle` containing the Fluent messages.
+/// - `id`: The identifier of the message to format.
+/// - `attr`: An optional attribute name used to fetch a specific attribute
+///   of the message. If `None`, the message's value is used.
+/// - `args`: An optional set of arguments (`FluentArgs`) for use in the
+///   message or attribute's pattern.
+///
+/// # Returns
+///
+/// - `Some(String)`: The formatted localized string if the message (and
+///   attribute, if specified) is found and formatting succeeds.
+/// - `None`: If the message or attribute is missing or if formatting fails.
+///
+/// # Examples
+///
+/// ```rust
+/// use fluent_bundle::{FluentBundle, FluentResource, FluentArgs};
+/// use your_crate::format;
+///
+/// let res = FluentResource::try_new("
+/// hello-world = Hello, { $name }!
+/// ".to_string()).unwrap();
+///
+/// let mut bundle = FluentBundle::default();
+/// bundle.add_resource(res).unwrap();
+///
+/// let mut args = FluentArgs::new();
+/// args.set("name", "Alice".into());
+///
+/// let result = format(&bundle, "hello-world", None, Some(&args));
+/// assert_eq!(result, Some("Hello, Alice!".to_string()));
+/// ```
+///
+/// # Notes
+///
+/// This function assumes that the `Bundle` is properly configured with the relevant
+/// Fluent resources and that the `id` and `attr` (if provided) correspond to valid
+/// entries in those resources.
 pub fn format(
     bundle: &Bundle,
     id: &str,
@@ -54,7 +203,53 @@ pub fn format(
     Some(bundle.format_pattern(pattern, args, &mut vec![]).into_owned())
 }
 
-/// Retrieves a translation string using the user's locale, falling back to the default bundle.
+/// Retrieves a localized string based on the given identifier and optional attributes or arguments.
+///
+/// This function attempts to fetch a translation string from the context's available
+/// translation resources for the current locale. If the locale-specific translation is not found,
+/// it falls back to a main/default translation resource. If neither is available, it logs a warning
+/// and returns the fallback value of the identifier itself.
+///
+/// # Arguments
+///
+/// * `ctx` - The [`Context`] object containing necessary resources and configurations for localization.
+/// * `id` - A string slice identifying the translation message.
+/// * `attr` - An optional attribute to retrieve a specific variant of the translation (can be `None`).
+/// * `args` - An optional set of arguments of type `FluentArgs` to interpolate into the message (can be `None`).
+///
+/// # Returns
+///
+/// Returns the formatted localized string. If no translation is found, the identifier itself is returned as a fallback.
+///
+/// # Behavior
+///
+/// 1. Fetches the translation resource based on the current locale from `ctx.data().translations`.
+/// 2. Attempts to format the string using `translations.other` for the given locale.
+/// 3. Falls back to a global/main translation resource if the locale-specific resource is not found.
+/// 4. Logs a warning if the translation is missing and uses the `id` as the fallback value.
+///
+/// # Example
+///
+/// ```rust
+/// let message = get(ctx, "welcome_message", None, None);
+/// println!("{}", message);
+/// ```
+///
+/// In this example, the function attempts to retrieve the `welcome_message` string based on
+/// the current locale and outputs it to the console. If unavailable, it will log a warning
+/// and print `"welcome_message"` as the fallback.
+///
+/// # Errors
+///
+/// * Logs a warning using `tracing` if no translation message is found with the provided `id` and locale.
+///
+/// # Dependencies
+///
+/// This function relies on:
+/// * A properly configured [`Context`] object providing locale and translation data.
+/// * Fluent localization features for interpolation and message formatting.
+///
+/// [`Context`]: poise::Context
 #[allow(unused)]
 pub fn get(
     ctx: Context,
@@ -72,7 +267,61 @@ pub fn get(
         })
 }
 
-/// Loads all `.ftl` files from the `translations/` folder into memory.
+/// Reads Fluent translation files from the "translations" directory and returns a `Translations` object.
+///
+/// # Description
+/// This function processes Fluent `.ftl` files to create a `Translations` object, which contains:
+/// - The main translations bundle (`main`) built from the `en-US.ftl` file.
+/// - Any additional translation bundles (`other`) present in the "translations" directory.
+///
+/// Each `.ftl` file is expected to have a valid locale name as its filename (e.g., `en-US.ftl`).
+///
+/// # Return
+/// Returns a `Result` which:
+/// - On success, contains a `Translations` object with the loaded translation bundles.
+/// - On failure, contains an `Error` describing what went wrong during the reading or parsing process.
+///
+/// # Errors
+/// The function can fail for several reasons:
+/// - Problems reading a `.ftl` file (e.g., file not found or permission issues).
+/// - Invalid or unparsable `.ftl` file contents.
+/// - Issues deriving localization settings from the filenames.
+/// - Problems parsing locales or building the Fluent `Bundle`.
+///
+/// # Internal Helper Function
+/// `read_single_ftl`:
+///   - A helper function that reads a single `.ftl` file, parses its contents, and returns a tuple containing:
+///     - The locale string (derived from the filename).
+///     - An associated Fluent `Bundle` object.
+///
+/// # Examples
+/// ```
+/// use your_crate::read_ftl;
+///
+/// match read_ftl() {
+///     Ok(translations) => {
+///         println!("Main translation loaded successfully.");
+///         println!("Other translations loaded: {}", translations.other.len());
+///     },
+///     Err(e) => eprintln!("Error loading translations: {:?}", e),
+/// }
+/// ```
+///
+/// # See Also
+/// - `FluentResource`: Used for compiling Fluent translation strings.
+/// - `Bundle`: Represents a collection of Fluent localization data.
+///
+/// # Dependencies
+/// - The "translations" directory must be available and contain valid `.ftl` files.
+/// - The `translations/en-US.ftl` file is expected to exist and serve as the main translation file.
+///
+/// # Arguments
+/// None.
+///
+/// # Return Type
+/// `Result<Translations, Error>`
+/// - On success, contains the `Translations` object.
+/// - On failure, an `Error` variant.
 pub fn read_ftl() -> Result<Translations, Error> {
     fn read_single_ftl(path: &Path) -> Result<(String, Bundle), Error> {
         let locale = path.file_stem()
@@ -98,7 +347,60 @@ pub fn read_ftl() -> Result<Translations, Error> {
     })
 }
 
-/// Applies translations to Poise command definitions, including names, descriptions, parameters, and subcommands.
+/// Updates the localization for commands and their subcommands.
+///
+/// This function modifies the command names, descriptions, parameters, and choices
+/// based on the provided translations. It also recursively processes any subcommands
+/// within the given commands.
+///
+/// # Arguments
+///
+/// * `translations` - A reference to a `Translations` struct that contains the main
+///   and other translation bundles. Each bundle provides locale-specific localization strings.
+/// * `commands` - A mutable reference to a slice of `poise::Command` items. Each command
+///   is updated to include localized names, descriptions, and parameter data based on the
+///   translation bundles provided.
+///
+/// # Behavior
+///
+/// 1. Iterates over the `commands` slice and applies translations using the locale-specific
+///    bundles in the `translations.other` field.
+/// 2. Updates:
+///    - The `name` and `description` of the command.
+///    - The `name` and `description` of each parameter in the command.
+///    - Each parameter's choice names.
+/// 3. Falls back to the `translations.main` bundle for default localization if a specific
+///    locale is not explicitly provided.
+/// 4. Recursively invokes itself on any subcommands defined under each command.
+///
+/// # Localization Logic
+///
+/// - For each `locale` in `translations.other`, the function:
+///   - Localizes the command name and description based on the bundle.
+///   - Localizes each parameter's name and description.
+///   - Localizes the names of parameter choices.
+/// - For the main (default) translation bundle:
+///   - Updates the primary `name` and `description` of the command.
+///   - Updates the primary `name` and `description` of each parameter.
+///   - Updates the primary name of each choice in the parameters.
+///
+/// # Example
+///
+/// ```rust
+/// let translations = Translations {
+///     main: Bundle { /* main translation bundle */ },
+///     other: HashMap::from([
+///         ("es".into(), Bundle { /* Spanish translation bundle */ }),
+///         ("fr".into(), Bundle { /* French translation bundle */ }),
+///     ]),
+/// };
+///
+/// let mut commands = vec![/* some poise::Command values */];
+/// apply_translations(&translations, &mut commands);
+/// ```
+///
+/// After executing the function, the `commands` slice will have all the names, descriptions,
+/// parameters, and subcommands updated as per the localization definitions.
 pub fn apply_translations(
     translations: &Translations,
     commands: &mut [poise::Command<Data, Error>],
@@ -161,7 +463,33 @@ pub fn apply_translations(
     }
 }
 
-/// Extracts all variable names like `{$var}` from a Fluent-formatted string.
+/// Extracts variable names enclosed within `{$...}` placeholders from a given pattern string.
+///
+/// The function takes a string pattern and uses a regular expression to identify all occurrences
+/// of variables enclosed within `{$...}`. These variables must follow the format of a `$`
+/// immediately followed by one or more word characters (letters, digits, or underscores).
+///
+/// # Arguments
+///
+/// * `pattern` - A string slice containing the text pattern to search for variables.
+///
+/// # Returns
+///
+/// A vector of strings containing the names of all variables found in the pattern.
+/// If no variables are found, the vector will be empty.
+///
+/// # Example
+///
+/// ```rust
+/// let pattern = "Hello, {$name}. Welcome to {$location}.";
+/// let variables = extract_variables_from_pattern(pattern);
+/// assert_eq!(variables, vec!["name", "location"]);
+/// ```
+///
+/// # Panics
+///
+/// This function panics if the regular expression fails to compile. However, the regex used
+/// in this function (`r"\{\$(\w+)\}"`) is hardcoded and should always compile successfully.
 fn extract_variables_from_pattern(pattern: &str) -> Vec<String> {
     Regex::new(r"\{\$(\w+)\}")
         .unwrap()
@@ -170,9 +498,19 @@ fn extract_variables_from_pattern(pattern: &str) -> Vec<String> {
         .collect()
 }
 
-/// Retrieves a translation and automatically fills missing variables from other Fluent messages.
-/// If a variable is not passed explicitly, it will attempt to resolve it using a fallback key
-/// with the same name (e.g. `{$create_universe}` → `create_universe`).
+/// This function retrieves a localized translation for a given message `id` based on the current context, locale,
+/// and any explicit arguments provided.
+///
+/// # Arguments
+///
+/// * `ctx` - The `Context` containing translation data and locale information.
+/// * `id` - The identifier of the translation token to be retrieved.
+/// * `explicit_args` - Optional arguments (`FluentArgs`) that may be explicitly provided for substitution
+///   in the translation string.
+///
+/// # Returns
+///
+/// * `Result<String, Error>` - If successful,
 pub fn smart_tr(
     ctx: Context,
     id: &str,

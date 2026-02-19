@@ -1,3 +1,42 @@
+//!  function that resolves to:
+//!  
+//!  * `Ok(Option<Stat>)` - If the query succeeds, returns `Some(Stat)` if the record is found,
+//!    or `None` if no matching record exists.
+//!  * `Err(Error)` - Returns an error if the query process fails.
+//! 
+//!  # Errors
+//! 
+//!  This function will return an error in the following scenarios:
+//!  - Unable to establish a connection to the database using `connect_db()`.
+//!  - The query operation fails in the database client.
+//! 
+//!  # Examples
+//! 
+//!  ```rust
+//!  let universe_id = "sample_universe_id";
+//!  let stat_name = "Health";
+//!  
+//!  let stat = Stat::get_stat_by_name(universe_id, stat_name).await;
+//!  match stat {
+//!      Ok(Some(stat)) => println!("Stat retrieved successfully: {:?}", stat),
+//!      Ok(None) => println!("Stat not found."),
+//!      Err(e) => eprintln!("Failed to retrieve stat: {:?}", e),
+//!  }
+//!  ```
+//! 
+//!  # Notes
+//! 
+//!  - This function assumes that the `connect_db()` function is properly implemented and
+//!    that the `DB_CLIENT` singleton is functional.
+//!  - The query uses `name` as the matching parameter to retrieve a specific `Stat`. If 
+//!    multiple documents with the same name exist, only one will be returned, as specified
+//!    by the database driver's behavior.
+//! 
+//!  # Dependencies
+//! 
+//!  This function relies on the following:
+//!  - A global `DB_CLIENT` to establish and manage database connections.
+//!  - `STATS_COLLECTION_NAME`, which specifies the target collection.
 use mongodb::bson::doc;
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
@@ -9,6 +48,35 @@ use crate::discord::poise_structs::Error;
 
 pub static SPEED_STAT: &str = "speed";
 
+/// Represents a value that can hold different types of statistical data. 
+///
+/// This enum is used to encapsulate multiple types of data commonly encountered 
+/// in statistical contexts, such as integers, floating-point numbers, strings, 
+/// and boolean values. It derives several useful traits to enable serialization, 
+/// comparison, cloning, and debugging.
+///
+/// # Variants
+///
+/// * `Int(u32)` - Represents an unsigned 32-bit integer value.
+/// * `Float(f32)` - Represents a 32-bit floating-point value.
+/// * `Text(String)` - Represents a string value.
+/// * `Bool(bool)` - Represents a boolean value (`true` or `false`).
+///
+/// # Derives
+///
+/// * `Serialize` and `Deserialize` - Enables serialization and deserialization of the enum, 
+///   making it compatible with data formats like JSON or MessagePack.
+/// * `Debug` - Enables formatting the enum for debugging purposes.
+/// * `Clone` - Allows creating deep copies of the enum.
+/// * `PartialOrd` and `PartialEq` - Provides support for partial ordering 
+///   and equality comparisons.
+///
+/// # Attributes
+///
+/// * `#[serde_as]` - Custom Serde attribute for advanced serialization/deserialization. 
+///
+/// This attribute may be used in conjunction with additional Serde annotations to 
+/// customize how the enum and its variants are serialized/deserialized.
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialOrd, PartialEq)]
 pub enum StatValue {
@@ -29,7 +97,74 @@ impl StatValue {
     }
 }
 
-
+/// Represents a `Stat` structure, which holds information about a specific statistical
+/// property within a given universe or context. This struct is designed to be serialized
+/// and deserialized for data interchange, and can be cloned for convenience.
+///
+/// # Attributes
+///
+/// * `_id` (`ObjectId`):
+///   The unique identifier for this `Stat`. This field is serialized as `_id` in the resulting data format.
+///
+/// * `universe_id` (`ObjectId`): 
+///   The identifier for the universe or scope to which this `Stat` belongs.
+///
+/// * `name` (`String`): 
+///   The name of the `Stat`, typically used for display or identification purposes.
+///
+/// * `base_value` (`StatValue`): 
+///   The initial or default value of the `Stat`.
+///
+/// * `formula` (`Option<String>`): 
+///   An optional formula associated with the `Stat` for deriving its value dynamically.
+///   If no formula is provided, the property may rely solely on its `base_value`.
+///
+/// * `min` (`Option<StatValue>`): 
+///   An optional minimum value constraint for the `Stat`.
+///
+/// * `max` (`Option<StatValue>`): 
+///   An optional maximum value constraint for the `Stat`.
+///
+/// * `modifiers` (`Vec<Modifier>`): 
+///   A collection of `Modifier` objects that dynamically alter the `Stat` value.
+///   Modifiers allow for flexible adjustments based on context or conditions.
+///
+/// # Derivable Traits
+///
+/// * `Serialize` and `Deserialize`: 
+///   Enables serialization and deserialization of the `Stat` struct using libraries like Serde.
+///
+/// * `Debug`: 
+///   Allows debugging through formatted output of the `Stat` structure.
+///
+/// * `Clone`: 
+///   Enables duplication of a `Stat` instance.
+///
+/// # Serde Attributes
+///
+/// * `#[serde_as]`: 
+///   Adds advanced serialization support through `serde_with` crate, if applicable.
+///
+/// * `#[serde(rename = "_id")]`: 
+///   Renames the `_id` field in serialized output to explicitly match the desired naming convention.
+///
+/// # Usage Example
+///
+/// ```rust
+/// use serde::{Serialize, Deserialize};
+/// use mongodb::bson::oid::ObjectId;
+///
+/// let stat = Stat {
+///     _id: ObjectId::new(),
+///     universe_id: ObjectId::new(),
+///     name: String::from("Health"),
+///     base_value: StatValue::Int(100),
+///     formula: Some(String::from("base_value + modifier")),
+///     min: Some(StatValue::Int(0)),
+///     max: Some(StatValue::Int(200)),
+///     modifiers: vec![],
+/// };
+/// ```
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Stat {
@@ -45,6 +180,59 @@ pub struct Stat {
 }
 
 impl Stat {
+    /// Asynchronously inserts a `Stat` document into the database.
+    ///
+    /// This function establishes a database connection, retrieves the corresponding
+    /// collection for the given universe ID, and then inserts the current instance 
+    /// of `self` into the `STATS_COLLECTION_NAME` collection. 
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Stat)` - Returns a cloned instance of `self` on successful insertion.
+    /// * `Err(Error)` - Returns an error if the insertion process fails.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error in the following scenarios:
+    /// - Unable to establish a connection to the database using `connect_db()`.
+    /// - The insertion operation fails with the database client, resulting in `"stat_insert__failed"`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// let stat_instance = Stat {
+    ///     // populate fields
+    /// };
+    ///
+    /// let result = stat_instance.insert_stat().await;
+    ///
+    /// match result {
+    ///     Ok(stat) => println!("Stat inserted successfully: {:?}", stat),
+    ///     Err(e) => eprintln!("Failed to insert stat: {:?}", e),
+    /// }
+    /// ```
+    ///
+    /// # Notes
+    ///
+    /// - Ensure the `connect_db()` function is properly defined and returns a valid 
+    /// MongoDB database client.
+    /// - The `universe_id` field in `self` is expected to be convertible to a string
+    /// for use as the database name.
+    /// - The `STATS_COLLECTION_NAME` should be defined elsewhere in the codebase as a 
+    /// constant representing the name of the collection to use.
+    ///
+    /// # Dependencies
+    ///
+    /// This function uses the following external components:
+    /// - A global `DB_CLIENT` which leverages `get_or_init` to initialize or retrieve
+    ///   an existing connection.
+    /// - `STATS_COLLECTION_NAME` which determines the collection into which the 
+    ///   document is inserted.
+    ///
+    /// # Safety
+    ///
+    /// If `DB_CLIENT` initialization fails or the database operation fails, the proper 
+    /// error handling mechanism should be in place to avoid runtime panics.
     pub async fn insert_stat(&self) -> Result<Stat, Error>{
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         let result = db_client
@@ -59,6 +247,42 @@ impl Stat {
         }
     }
 
+    /// Retrieves a specific statistic by its name from the database.
+    ///
+    /// # Parameters
+    /// - `universe_id`: A string slice representing the ID of the database (or namespace) to query.
+    /// - `name`: A string slice representing the name of the statistic to retrieve.
+    ///
+    /// # Returns
+    /// An `async` function that returns a `mongodb::error::Result`:
+    /// - `Ok(Some(Stat))`: If a statistic with the given name is found, it returns a wrapped `Stat` object.
+    /// - `Ok(None)`: If no statistic with the given name is found.
+    /// - `Err(mongodb::error::Error)`: If there is an error during the database query operation.
+    ///
+    /// # Behavior
+    /// - Establishes a connection to the database using a cached `DB_CLIENT`.
+    /// - Queries the specified collection (`STATS_COLLECTION_NAME`) within the database identified
+    ///   by `universe_id` for the document where the "name" field matches the given `name`.
+    ///
+    /// # Example
+    /// ```rust
+    /// let stat = get_stat_by_name("game_universe", "player_kills").await?;
+    /// match stat {
+    ///     Some(stat) => println!("Found stat: {:?}", stat),
+    ///     None => println!("No statistic found with the given name."),
+    /// }
+    /// # Ok::<(), mongodb::error::Error>(())
+    /// ```
+    ///
+    /// # Dependencies
+    /// - The function relies on a globally initialized `DB_CLIENT` to manage database connections.
+    /// - Assumes `STATS_COLLECTION_NAME` is defined elsewhere in the code.
+    /// - The `Stat` struct represents the schema of the statistic documents.
+    ///
+    /// # Errors
+    /// This function may return a `mongodb::error::Error` if:
+    /// - The database connection cannot be established.
+    /// - The query execution fails.
     pub async fn get_stat_by_name(universe_id: &str, name: &str) -> mongodb::error::Result<Option<Stat>> {
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         let filter = doc! { "name": name };
@@ -68,6 +292,36 @@ impl Stat {
             .find_one(filter)
             .await
     }
+    
+    /// Checks if the `base_value` is within the optional `min` and `max` bounds.
+    ///
+    /// This method evaluates whether `base_value` respects the range defined by
+    /// the `min` and `max` values, if they are present:
+    /// - If `min` is defined, `base_value` must be greater than or equal to `min`.
+    /// - If `max` is defined, `base_value` must be less than or equal to `max`.
+    ///
+    /// # Returns
+    /// - `true` if `base_value` is within the specified bounds or if no bounds are set.
+    /// - `false` if `base_value` is out of bounds.
+    ///
+    /// # Examples
+    /// ```
+    /// let instance = MyStruct {
+    ///     base_value: 10,
+    ///     min: Some(5),
+    ///     max: Some(15),
+    /// };
+    /// assert_eq!(instance.is_within_bounds(), true);
+    ///
+    /// let instance = MyStruct {
+    ///     base_value: 20,
+    ///     min: Some(5),
+    ///     max: Some(15),
+    /// };
+    /// assert_eq!(instance.is_within_bounds(), false);
+    /// ```
+    ///
+    /// Note: This function assumes that `min` is less than or equal to `max` if both are defined.
     pub fn is_within_bounds(&self) -> bool {
         if let Some(min) = &self.min {
             if self.base_value < *min {

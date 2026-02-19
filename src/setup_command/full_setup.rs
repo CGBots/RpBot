@@ -1,56 +1,31 @@
-//! Full setup functionality for Discord server initialization.
-//!
-//! This module provides the complete setup process for a Discord server, combining both
-//! partial setup (basic roles and channels) and complementary setup (additional categories
-//! and specialized channels). It includes automatic rollback capabilities in case of failures.
-
 use crate::database::server::Server;
 use crate::discord::poise_structs::{Context, Error};
 use crate::setup_command::complementary_setup::complementary_setup;
 use crate::setup_command::partial_setup::partial_setup;
 
-/// Performs a complete setup of the Discord server including roles, channels, and categories.
-///
-/// This function orchestrates the full server setup process by executing partial setup first
-/// (creating basic roles and channels) followed by complementary setup (creating categories
-/// and additional channels). If the complementary setup fails, all resources created during
-/// partial setup are automatically rolled back to maintain consistency.
+/// Performs a complete asynchronous setup of the server by sequentially running the
+/// `partial_setup` and `complementary_setup` functions. If both steps succeed, it returns
+/// a confirmation string indicating success.
 ///
 /// # Arguments
-///
-/// * `ctx` - The Discord command context providing access to the HTTP API and cache
-/// * `server` - A mutable reference to the Server database entity that will be updated with
-///              the IDs of created Discord resources
+/// * `ctx` - A reference to the operational context providing utilities and shared state.
+/// * `server` - A mutable reference to the server being configured.
+/// * `snapshot` - A snapshot of the server's state used during the setup process.
 ///
 /// # Returns
+/// * `Ok(&'static str)` - A string identifier confirming the successful setup.
+/// * `Err(Error)` - An error type indicating that one of the setup steps failed.
 ///
-/// * `Ok((&str, Vec<Role>, Vec<GuildChannel>))` - Success tuple containing:
-///   - A translation key for the success message ("setup__setup_success_message")
-///   - Vector of all created roles (from both partial and complementary setup)
-///   - Vector of all created channels (from both partial and complementary setup)
-///
-/// * `Err(Vec<&str>)` - Vector of translation keys for error messages encountered during setup
-///
-/// # Error Handling
-///
-/// If partial_setup fails, the error is immediately returned.
-/// If complementary_setup fails after partial_setup succeeds, all roles and channels created
-/// during partial_setup are deleted before returning the error.
+/// # Errors
+/// This function forwards any errors returned by `partial_setup` or `complementary_setup`.
 ///
 /// # Examples
-///
-/// ```no_run
-/// use crate::setup_command::full_setup::full_setup;
-///
-/// async fn setup_server(ctx: Context<'_>, server: &mut Server) {
-///     match full_setup(ctx, server).await {
-///         Ok((msg_key, roles, channels)) => {
-///             println!("Setup successful: {} roles, {} channels", roles.len(), channels.len());
-///         }
-///         Err(errors) => {
-///             eprintln!("Setup failed with errors: {:?}", errors);
-///         }
-///     }
+/// ```rust
+/// // Assuming `ctx`, `server`, and `snapshot` are already initialized:
+/// let result = full_setup(&ctx, &mut server, snapshot).await;
+/// match result {
+///     Ok(success_message) => println!("{}", success_message),
+///     Err(e) => eprintln!("Setup failed: {}", e),
 /// }
 /// ```
 pub async fn full_setup<'a>(ctx: &Context<'_>, server: &'a mut Server, snapshot: Server) -> Result<&'static str, Error> {

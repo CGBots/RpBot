@@ -1,20 +1,3 @@
-//! Setup command handler for Discord server configuration.
-//!
-//! This module provides the `/setup` command that allows server administrators to configure
-//! their Discord server with roles, channels, and categories required for roleplay functionality.
-//!
-//! # Features
-//!
-//! - **Full Setup**: Creates all roles (Admin, Moderator, Spectator, Player), categories
-//!   (Administration, Non-RP, RolePlay, Roads), and channels (character sheets, wiki, logs,
-//!   commands, moderation, general).
-//! - **Partial Setup**: Creates only the minimum necessary roles and channels.
-//! - **Validation**: Checks if the server is registered in a universe before proceeding.
-//! - **Interactive Confirmation**: Prompts users if the server is already configured.
-//!
-//! # Permissions
-//!
-//! This command requires `ADMINISTRATOR` permissions and can only be used in guilds.
 use poise::{CreateReply};
 use serenity::all::{ButtonStyle, Color, ComponentInteractionCollector, CreateActionRow, CreateButton, CreateEmbed};
 use crate::database::server::Server;
@@ -24,55 +7,49 @@ use crate::setup_command::full_setup::full_setup;
 use crate::setup_command::partial_setup::partial_setup;
 use crate::utility::reply::reply;
 
-/// The type of setup to perform on the Discord server.
-///
-/// This enum defines two configuration modes for server setup.
+///  * Enum representing the type of setup to be performed.
+///  *
+///  * This enum is derived with `Debug`, `poise::ChoiceParameter`, `Clone`, and `Copy` traits,
+///  * enabling its use in various contexts such as debugging, dropdown choices in commands
+///  * (when using the `poise` framework), and shallow copying.
+///  *
+///  * Variants:
+///  * - `FullSetup`: Represents a complete setup process.
+///  * - `PartialSetup`: Represents a partial or incomplete setup process.
+
 #[derive(Debug, poise::ChoiceParameter, Clone, Copy)]
 pub enum SetupType {
-    /// Creates all roles, categories, and channels including admin tools,
-    /// character sheets, wiki, and moderation channels.
     FullSetup,
-    /// Creates only the minimum necessary roles and channels for basic functionality.
     PartialSetup
 }
 
-/// Configures the Discord server with roles, channels, and categories for roleplay.
+/// Sets up the bot or configuration based on the provided setup type.
 ///
-/// This command initializes or updates the server configuration based on the selected setup type.
-/// It validates that the server is registered in a universe and prompts for confirmation if
-/// existing configuration is detected.
-///
-/// # Arguments
-///
-/// * `ctx` - The command context containing guild and user information.
-/// * `setup_type` - The type of setup to perform (Full or Partial).
+/// # Parameters
+/// - `ctx`: The command context, providing access to interaction details, bot state, and more.
+/// - `setup_type`: The type of setup to perform, specified by the `SetupType` enum.
 ///
 /// # Returns
+/// - `Result<(), Error>`: Returns `Ok(())` if the setup process completes successfully, or an `Error` if it fails.
 ///
-/// * `Ok(())` - If the setup completes successfully or is cancelled by the user.
-/// * `Err(Error)` - If there are issues with permissions, database access, or Discord API calls.
+/// # Command Attributes
+/// - `slash_command`: This function is executable as a slash command.
+/// - `required_permissions = "ADMINISTRATOR"`: Only users with administrator permissions in the guild can use this command.
+/// - `guild_only`: The command can only be invoked in a guild context, not in direct messages.
+///
+/// # Behavior
+/// 1. Defers the response to provide more time for the execution.
+/// 2. Delegates the main setup logic to a helper function `_setup`, passing in the context and the setup type.
+/// 3. Replies to the user with the result of the setup process.
 ///
 /// # Errors
+/// This function may return an error if:
+/// - Deferring the interaction fails.
+/// - The setup process encounters an issue.
+/// - Replying to the user fails.
 ///
-/// This function will return an error if:
-/// - The guild is not registered in any universe
-/// - The server configuration cannot be retrieved from the database
-/// - Role or channel creation fails due to insufficient permissions
-/// - The database update fails
-///
-/// # Examples
-///
-/// ```text
-/// /setup setup_type:Full
-/// /setup setup_type:Partial
-/// ```
-///
-/// # Permissions
-///
-/// Requires `ADMINISTRATOR` permission and must be used in a guild context.
-///
-///
-// ... existing code ...
+/// # Usage
+/// This command is intended to be run by guild administrators to perform initial setup steps or configurations required for the bot's operation.
 #[poise::command(slash_command, required_permissions = "ADMINISTRATOR", guild_only)]
 pub async fn setup(ctx: Context<'_>, setup_type: SetupType) -> Result<(), Error> {
     ctx.defer().await?;
@@ -81,17 +58,58 @@ pub async fn setup(ctx: Context<'_>, setup_type: SetupType) -> Result<(), Error>
     Ok(())
 }
 
+/// Asynchronously initializes or reconfigures the server setup process based on the provided setup type.
+///
+/// # Arguments
+/// * `ctx` - The context of the command, which includes the guild and channel information where the command was triggered.
+/// * `setup_type` - An enum representing the type of setup to perform. Can be either `FullSetup` or `PartialSetup`.
+///
+/// # Returns
+/// `Result<&'static str, Error>` - Returns a success message if the setup process completes successfully, or an error message if the operation fails.
+///
+/// # Workflow
+/// 1. Retrieves the `guild_id` from the context.
+/// 2. Fetches the server from the database by its `guild_id`. If the server is not found, an error is returned.
+/// 3. Checks if the server has any existing setup configuration (roles, categories, or channels):
+///    - If a configuration exists, prompts the user for confirmation (via interactive buttons) to either cancel or continue the setup:
+///      - If the user cancels, the setup process terminates with a cancellation response.
+///      - If the user chooses to continue, the process resets the existing setup.
+///    - If no configuration exists, proceeds directly to the setup process.
+/// 4. Executes either a full or partial setup based on the `setup_type` provided:
+///    - `FullSetup`: Performs a comprehensive setup with all components of the server.
+///    - `PartialSetup`: Configures only a subset of the server based on specific criteria.
+/// 5. Updates the server configuration in the database.
+/// 6. Returns a success message if the setup completes successfully, or an error message if an error occurs.
+///
+/// # Button Interaction Workflow
+/// - Users are presented with interactive buttons (`Cancel` and `Continue`) if a configuration is already present:
+///   - `Cancel`: Deletes the interactive message and exits the setup process.
+///   - `Continue`: Proceeds with the setup while removing the interactive buttons.
+///
+/// # Timeout Handling
+/// - If the user does not interact with the confirmation buttons within 60 seconds, the interactive message is deleted
+///   and the process is aborted, returning a timeout error.
+///
+/// # Errors
+/// - `"setup__server_not_found"`: The server was not found in the database.
+/// - `"setup__server_already_setup_timeout"`: The user did not respond to the interactive buttons within the timeout period.
+/// - `"setup_server__cancelled"`: The user chose to cancel the setup process.
+/// - `"setup_server__failed"`: A generic error indicating that the setup process encountered an issue.
+///
+/// # Example Usage
+/// ```rust
+/// let result = _setup(ctx, SetupType::FullSetup).await;
+/// match result {
+///     Ok(message) => println!("{}", message), // Prints "setup_server__success" on success.
+///     Err(error) => eprintln!("{}", error),    // Prints error messages like "setup__server_not_found".
+/// }
+/// ```
 pub async fn _setup(ctx: &Context<'_>, setup_type: SetupType) -> Result<&'static str, Error> {
-
     let guild_id = ctx.guild_id().unwrap();
 
-    let Some(mut server) = Server::get_server_by_id(guild_id.get().to_string()).await? else {return Err("setup__server_not_found".into())};
+    let Some(mut server) = Server::get_server_by_id(guild_id.get()).await? else { return Err("setup__server_not_found".into()) };
     let server_snapshot = server.clone().snaphot(ctx).await;
 
-    // Check if any server configuration already exists by testing all possible fields.
-    // This comprehensive check detects partial setups where only some roles/channels were created.
-    // If any field is populated, we need user confirmation before proceeding, as the setup
-    // process will attempt to create missing elements and may overwrite existing configuration.
     if server.admin_role_id.is_some()
         || server.moderator_role_id.is_some()
         || server.spectator_role_id.is_some()
@@ -103,10 +121,6 @@ pub async fn _setup(ctx: &Context<'_>, setup_type: SetupType) -> Result<&'static
         || server.rp_category_id.is_some()
         || server.rp_character_channel_id.is_some() {
 
-        // Present an interactive confirmation dialog with Cancel/Continue buttons.
-        // The ComponentInteractionCollector waits up to 60 seconds for the user to respond.
-        // This prevents accidental overwrites by requiring explicit user confirmation.
-        // Three outcomes: timeout (cancel), explicit cancel, or continue (any other button).
         let reply = {
             let components = vec![CreateActionRow::Buttons(vec![
                 CreateButton::new("cancel")
@@ -139,7 +153,8 @@ pub async fn _setup(ctx: &Context<'_>, setup_type: SetupType) -> Result<&'static
         match interaction {
             None => {
                 message.delete(*ctx).await?;
-                return Err("setup__server_already_setup_timeout".into()); }
+                return Err("setup__server_already_setup_timeout".into());
+            }
             Some(mci) => {
                 mci.defer(ctx).await?;
                 message.edit(*ctx, reply.components(vec!())).await?;
@@ -162,7 +177,7 @@ pub async fn _setup(ctx: &Context<'_>, setup_type: SetupType) -> Result<&'static
     server.update().await?;
 
     match result {
-        Ok(_) => {Ok("setup_server__success")}
-        Err(_) => {Err("setup_server__failed".into())}
+        Ok(_) => { Ok("setup_server__success") }
+        Err(_) => { Err("setup_server__failed".into()) }
     }
 }

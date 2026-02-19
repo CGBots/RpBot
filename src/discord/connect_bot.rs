@@ -11,6 +11,7 @@ use serenity::all::GatewayIntents;
 use serenity::Client;
 use serenity::client::ClientBuilder;
 use crate::{translation};
+use crate::create_place::handler::place;
 use crate::create_universe_command::handler::{universe};
 use crate::discord::handler::Handler;
 use crate::ping_command::handler::ping;
@@ -23,11 +24,68 @@ static SHARD_NUMBER: u32 = 1;
 #[cfg(test)]
 pub(crate) static TEST_PASSED: Mutex<VecDeque<bool>> = Mutex::new(VecDeque::new());
 
+/// Establishes and configures a Discord bot client, initializing the necessary components and
+/// handling both environment-specific behavior (e.g., test vs. production) and translations.
+///
+/// # Returns
+///
+/// - In production mode (`#[cfg(not(test))]`), the function returns an `Ok(Client)` that is ready 
+///   to handle Discord events.
+/// - In test mode (`#[cfg(test)]`), the function sleeps briefly and returns an `Err(())`.
+///
+/// # Steps
+/// 1. Initializes logging using `tracing_subscriber`.
+/// 2. Prepares a list of commands using `ping()`, `universe()`, and `start()`.
+/// 3. Reads and applies translation files to the commands.
+/// 4. Retrieves the Discord bot token from the `DISCORD_TOKEN` environment variable.
+/// 5. Builds `FrameworkOptions` for the bot framework, registering global commands and setting up app data.
+/// 6. Handles two build modes:
+///     - **Production**:
+///       - Creates a `Client` with the specified token, event handler, intents, and framework.
+///       - Starts the Discord client's shards.
+///       - Returns the configured client.
+///     - **Test**:
+///       - Creates and locks a `Client` wrapped in an `Arc<Mutex<>>` for asynchronous use.
+///       - Spawns a task to simulate shard handling in testing.
+///       - Waits asynchronously for a brief duration using Tokio's sleep.
+///       - Returns an error to indicate test-specific flow.
+///
+/// # Panics
+/// - If it fails to read the translation files.
+/// - If the `DISCORD_TOKEN` is missing in the environment.
+/// - If the framework or client creation fails.
+///
+/// # Configuration
+/// - `GatewayIntents` are configured to include `GUILD_MESSAGES`, `DIRECT_MESSAGES`, and `MESSAGE_CONTENT`.
+/// - Translations are applied using the `apply_translations` function with the data read by `read_ftl`.
+///
+/// # Environment Variables
+/// - **DISCORD_TOKEN**: The bot token required to connect to Discord.
+///
+/// # Framework Options
+/// - Commands are registered globally during setup.
+///
+/// # Platforms
+/// - Includes both testing and production configurations under relevant `cfg` attributes.
+///
+/// # Note
+/// - The test mode includes instrumentation to ensure the bot initializes correctly without requiring a connection
+///   to an actual Discord gateway.
+///
+/// # Example
+/// ```rust
+/// #[tokio::main]
+/// async fn main() {
+///     if let Err(err) = connect_bot().await {
+///         eprintln!("Failed to connect the bot: {:?}", err);
+///     }
+/// }
+/// ```
 pub async fn connect_bot() -> Result<Client, ()>{
     tracing_subscriber::fmt::init();
     
     
-    let mut commands= vec![ping(), universe(), start()];
+    let mut commands= vec![ping(), universe(), start(), place()];
     
     
     let translations = translation::read_ftl().expect("failed to read translation files");

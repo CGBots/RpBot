@@ -1,40 +1,3 @@
-//! Server model and database helpers.
-//!
-//! This module defines the `Server` document (as stored in MongoDB) and
-//! convenience methods for inserting and retrieving server documents.
-//!
-//! A `Server` links a Discord guild to a universe and stores IDs for
-//! roles/categories/channels used by the bot within that guild.
-//!
-//! Notes:
-//! - The module uses `serde_with::DisplayFromStr` to serialize numeric
-//!   identifiers as strings in MongoDB for compatibility.
-//! - Database access is performed through the global `DB_CLIENT`.
-//!
-//! # Example
-//! ```no_run
-//! use crate::database::server::Server;
-//!
-//! // Build a new Server document and insert it into the universe-specific DB
-//! let server = Server {
-//!     _id: Default::default(),
-//!     universe_id: Default::default(),
-//!     server_id: 123456789012345678,
-//!     admin_role_id: None,
-//!     moderator_role_id: None,
-//!     spectator_role_id: None,
-//!     player_role_id: None,
-//!     everyone_role_id: None,
-//!     admin_category_id: None,
-//!     nrp_category_id: None,
-//!     rp_category_id: None,
-//!     road_category_id: None,
-//!     index_forum_id: None,
-//!     character_channel_id: None,
-//! };
-//! let insert_res = server.insert_server("universe_db_name").await.unwrap();
-//! ```
-
 use std::cmp::PartialEq;
 use log::{log, Level};
 use mongodb::bson::{doc, to_document};
@@ -46,6 +9,10 @@ use crate::database::db_client::{DB_CLIENT, connect_db};
 use crate::database::db_namespace::{RPBOT_DB_NAME, SERVER_COLLECTION_NAME};
 use crate::discord::poise_structs::{Context, Error};
 
+/// Represents the type of a Discord identifier.
+///
+/// Used to distinguish between different Discord entity types
+/// when storing and managing IDs.
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub enum IdType {
@@ -54,6 +21,10 @@ pub enum IdType {
     Category
 }
 
+/// Represents a Discord identifier with an associated type.
+///
+/// Combines a Discord snowflake ID (`u64`) with its corresponding
+/// entity type (role, channel, or category).
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct Id{
@@ -73,13 +44,21 @@ impl From<u64> for Id {
     }
 }
 
-// Define a trait for the functionality
+/// Extension trait for deleting Discord entities represented by `Option<Id>`.
 pub trait IdExt {
     async fn delete(&mut self, ctx: &Context<'_>) -> Result<&'static str, Error>;
 }
 
 // Implement the trait for Option<Id>
 impl IdExt for Option<Id> {
+    /// Deletes the Discord entity (role or channel) and sets `self` to `None` on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - `self` is `None` (`"id__nothing_to_delete"`)
+    /// - Not in a guild context (`"guild_only"`)
+    /// - The deletion fails (`"id__role_delete_failed"` or `"id__channel_delete_failed"`)
     async fn delete(&mut self, ctx: &Context<'_>) -> Result<&'static str, Error> {
         match self {
             None => Err("id__nothing_to_delete".into()),
@@ -112,14 +91,11 @@ impl IdExt for Option<Id> {
     }
 }
 
-/// Represents a server (Discord guild) document stored in MongoDB.
+/// Represents a Discord server's configuration and associated universe.
 ///
-/// This struct stores the link between a server and its universe and keeps
-/// commonly used role/category/channel IDs so the bot can restore or
-/// configure the guild accordingly.
-///
-/// All numeric identifiers are serialized as strings in the database via
-/// `DisplayFromStr` to ensure compatibility with clients that expect string IDs.
+/// Stores the server's Discord guild ID, associated universe, and optional
+/// IDs for roles, categories, and channels used by the bot for roleplay
+/// and moderation features.
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct Server {
@@ -199,9 +175,7 @@ impl PartialEq for Id {
 }
 
 impl Server {
-    /// Create a deep clone of the `Server` instance.
-    ///
-    /// Use this if you need an owned copy to mutate independently of the original.
+    /// Creates a deep clone of the server configuration.
     #[allow(unused)]
     pub fn clone(&self) -> Self {
         Self {
@@ -226,23 +200,11 @@ impl Server {
         }
     }
 
-    /// Insert this `Server` document into the universe-specific MongoDB database.
-    ///
-    /// # Arguments
-    ///
-    /// * `universe_db_name` - Name of the MongoDB database to insert into (usually
-    ///   derived from the universe document).
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(InsertOneResult)` on success.
-    /// * `Err(mongodb::error::Error)` when the insert fails.
+    /// Inserts this server configuration into the database.
     ///
     /// # Errors
     ///
-    /// This method acquires a lock on the global `DB_CLIENT` and forwards the
-    /// insert request to the specified database. Any MongoDB error is returned
-    /// to the caller.
+    /// Returns a MongoDB error if the insert operation fails.
     pub async fn insert_server(&self) -> mongodb::error::Result<InsertOneResult> {
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         db_client
@@ -252,28 +214,16 @@ impl Server {
             .await
     }
 
-    /// Retrieve a `Server` document by its `server_id` (string form).
+    /// Retrieves a server configuration by Discord guild ID.
     ///
-    /// # Arguments
+    /// # Errors
     ///
-    /// * `server_id` - The Discord guild ID as a string (serialized form in DB).
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(Some(Server))` if a matching document is found.
-    /// * `Ok(None)` if no document matches the filter.
-    /// * `Err(mongodb::error::Error)` on database errors.
-    ///
-    /// # Notes
-    ///
-    /// This convenience function queries the global RPBot database using the
-    /// standard `RPBOT_DB_NAME`. If you want to search inside a universe-specific
-    /// database, call the collection on that DB explicitly.
+    /// Returns a MongoDB error if the query fails.
     pub async fn get_server_by_id(
-        server_id: String,
+        server_id: u64,
     ) -> mongodb::error::Result<Option<Server>> {
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
-        let filter = doc! { "server_id": server_id };
+        let filter = doc! { "server_id": server_id.to_string() };
         db_client
             .database(RPBOT_DB_NAME)
             // NOTE: The original code used UNIVERSE_COLLECTION_NAME here.
@@ -283,6 +233,13 @@ impl Server {
             .await
     }
 
+    /// Updates this server configuration in the database.
+    ///
+    /// Uses the `_id` field to locate and update the document.
+    ///
+    /// # Errors
+    ///
+    /// Returns a MongoDB error if the update operation fails.
     pub async fn update(&self) -> mongodb::error::Result<UpdateResult> {
         let mut doc = to_document(self).unwrap();
         doc.remove("_id");
@@ -296,24 +253,141 @@ impl Server {
             .update_one(filter, update).await
     }
 
+    /// Sets the universe ID. Returns `self` for method chaining.
     pub fn universe_id(&mut self, universe_id: impl Into<ObjectId>) -> &mut Self {self.universe_id = universe_id.into(); self}
+
+    /// Sets the Discord guild ID. Returns `self` for method chaining.
     pub fn server_id(&mut self, server_id: impl Into<u64>) -> &mut Self {self.server_id = server_id.into(); self}
+
+    /// Sets the admin role ID. Returns `self` for method chaining.
     pub fn admin_role_id(&mut self, admin_role_id: impl Into<Id>) -> &mut Self {self.admin_role_id = Some(admin_role_id.into()); self}
+
+    /// Sets the moderator role ID. Returns `self` for method chaining.
     pub fn moderator_role_id(&mut self, moderator_role_id: impl Into<Id>) -> &mut Self {self.moderator_role_id = Some(moderator_role_id.into()); self}
-    pub fn spectator_role_id(&mut self, spectator_role_id: impl Into<Id>) -> &mut Self {self.spectator_role_id = Some(spectator_role_id.into()); self}
-    pub fn player_role_id(&mut self, player_role_id: impl Into<Id>) -> &mut Self {self.player_role_id = Some(player_role_id.into()); self}
-    pub fn everyone_role_id(&mut self, everyone_role_id: impl Into<Id>) -> &mut Self {self.everyone_role_id = Some(everyone_role_id.into()); self}
-    pub fn admin_category_id(&mut self, admin_category_id: impl Into<Id>) -> &mut Self {self.admin_category_id = Some(admin_category_id.into()); self}
-    pub fn nrp_category_id(&mut self, nrp_category_id: impl Into<Id>) -> &mut Self {self.nrp_category_id = Some(nrp_category_id.into()); self}
-    pub fn rp_category_id(&mut self, rp_category_id: impl Into<Id>) -> &mut Self {self.rp_category_id = Some(rp_category_id.into()); self}
-    pub fn road_category_id(&mut self, road_category_id: impl Into<Id>) -> &mut Self {self.road_category_id = Some(road_category_id.into()); self}
-    pub fn rp_wiki_channel_id(&mut self, rp_wiki_channel_id: impl Into<Id>) -> &mut Self {self.rp_wiki_channel_id = Some(rp_wiki_channel_id.into()); self}
-    pub fn log_channel_id(&mut self, log_channel_id: impl Into<Id>) -> &mut Self {self.log_channel_id = Some(log_channel_id.into()); self}
-    pub fn moderation_channel_id(&mut self, moderation_channel_id: impl Into<Id>) -> &mut Self {self.moderation_channel_id = Some(moderation_channel_id.into()); self}
-    pub fn commands_channel_id(&mut self, commands_channel_id: impl Into<Id>) -> &mut Self {self.commands_channel_id = Some(commands_channel_id.into()); self}
-    pub fn nrp_general_channel_id(&mut self, nrp_general_channel_id: impl Into<Id>) -> &mut Self{self.nrp_general_channel_id = Some(nrp_general_channel_id.into()); self}
+    /// Sets the spectator role ID. Returns `self` for method chaining.
+    pub fn spectator_role_id(&mut self, spectator_role_id: impl Into<Id>) -> &mut Self {
+        self.spectator_role_id = Some(spectator_role_id.into());
+        self
+    }
+    /// Sets the player role ID. Returns `self` for method chaining.
+    pub fn player_role_id(&mut self, player_role_id: impl Into<Id>) -> &mut Self {
+        self.player_role_id = Some(player_role_id.into());
+        self
+    }
+    /// Sets the everyone role ID. Returns `self` for method chaining.
+    pub fn everyone_role_id(&mut self, everyone_role_id: impl Into<Id>) -> &mut Self {
+        self.everyone_role_id = Some(everyone_role_id.into());
+        self
+    }
+    /// Sets the admin category ID. Returns `self` for method chaining.
+    pub fn admin_category_id(&mut self, admin_category_id: impl Into<Id>) -> &mut Self {
+        self.admin_category_id = Some(admin_category_id.into());
+        self
+    }
+    /// Sets the NRP (non-roleplay) category ID. Returns `self` for method chaining.
+    pub fn nrp_category_id(&mut self, nrp_category_id: impl Into<Id>) -> &mut Self {
+        self.nrp_category_id = Some(nrp_category_id.into());
+        self
+    }
+    /// Sets the RP (roleplay) category ID. Returns `self` for method chaining.
+    pub fn rp_category_id(&mut self, rp_category_id: impl Into<Id>) -> &mut Self {
+        self.rp_category_id = Some(rp_category_id.into());
+        self
+    }
+    /// Sets the road category ID. Returns `self` for method chaining.
+    pub fn road_category_id(&mut self, road_category_id: impl Into<Id>) -> &mut Self {
+        self.road_category_id = Some(road_category_id.into());
+        self
+    }
+    /// Sets the RP wiki channel ID. Returns `self` for method chaining.
+    pub fn rp_wiki_channel_id(&mut self, rp_wiki_channel_id: impl Into<Id>) -> &mut Self {
+        self.rp_wiki_channel_id = Some(rp_wiki_channel_id.into());
+        self
+    }
+    /// Sets the log channel ID. Returns `self` for method chaining.
+    pub fn log_channel_id(&mut self, log_channel_id: impl Into<Id>) -> &mut Self {
+        self.log_channel_id = Some(log_channel_id.into());
+        self
+    }
+    /// Sets the moderation channel ID. Returns `self` for method chaining.
+    pub fn moderation_channel_id(&mut self, moderation_channel_id: impl Into<Id>) -> &mut Self {
+        self.moderation_channel_id = Some(moderation_channel_id.into());
+        self
+    }
+    /// Sets the commands channel ID. Returns `self` for method chaining.
+    pub fn commands_channel_id(&mut self, commands_channel_id: impl Into<Id>) -> &mut Self {
+        self.commands_channel_id = Some(commands_channel_id.into());
+        self
+    }
+    /// Sets the NRP general channel ID. Returns `self` for method chaining.
+    pub fn nrp_general_channel_id(&mut self, nrp_general_channel_id: impl Into<Id>) -> &mut Self {
+        self.nrp_general_channel_id = Some(nrp_general_channel_id.into());
+        self
+    }
+    /// Sets the RP character channel ID. Returns `self` for method chaining.
     pub fn rp_character_channel_id(&mut self, rp_character_channel_id: impl Into<Id>) -> &mut Self {self.rp_character_channel_id = Some(rp_character_channel_id.into()); self}
 
+    /// Rolls back the current server configuration to a previous snapshot state.
+    ///
+    /// This asynchronous method compares the current server configuration with a provided
+    /// snapshot and deletes any roles, categories, or channels that differ between them.
+    /// All deletion operations are executed concurrently using `join_all`, and any errors
+    /// encountered during deletion are logged.
+    ///
+    /// # Parameters
+    ///
+    /// - `ctx`: A reference to the Discord context, used for performing Discord API operations
+    ///   such as deleting roles and channels.
+    /// - `snapshot`: A previous state of the `Server` instance to which the current state should
+    ///   be rolled back. Fields that differ from the snapshot will be deleted.
+    ///
+    /// # Behavior
+    ///
+    /// The method performs the following steps:
+    /// 1. Creates an array of mutable references to the current server's role/channel fields
+    ///    paired with their corresponding snapshot values.
+    /// 2. Filters the fields to identify those that differ between the current state and the snapshot.
+    /// 3. Collects futures for deleting the differing fields using the `IdExt::delete` method.
+    /// 4. Executes all deletion operations concurrently using `join_all`.
+    /// 5. Logs any errors that occur during deletion with error-level logging, including
+    ///    the universe ID, server ID, and error message.
+    ///
+    /// # Fields Rolled Back
+    ///
+    /// The following fields are checked and potentially rolled back:
+    /// - `admin_role_id`
+    /// - `moderator_role_id`
+    /// - `spectator_role_id`
+    /// - `player_role_id`
+    /// - `admin_category_id`
+    /// - `nrp_category_id`
+    /// - `rp_category_id`
+    /// - `road_category_id`
+    /// - `rp_wiki_channel_id`
+    /// - `log_channel_id`
+    /// - `moderation_channel_id`
+    /// - `commands_channel_id`
+    /// - `nrp_general_channel_id`
+    /// - `rp_character_channel_id`
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let mut server = Server::default();
+    /// let snapshot = server.clone();
+    /// // ... modify server ...
+    /// server.rollback(&ctx, snapshot).await;
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Errors during deletion operations are logged but do not cause the function to return
+    /// an error. This allows the rollback to proceed even if some deletions fail.
+    ///
+    /// # Notes
+    ///
+    /// - This method requires the `futures` crate for `join_all`.
+    /// - Errors are logged using the `log` crate at the `Error` level.
     pub async fn rollback(&mut self, ctx: &Context<'_>, snapshot: Self) {
         use futures::future::join_all;
 
@@ -358,7 +432,16 @@ impl Server {
             }
         });
     }
-    
+
+    /// Creates a validated snapshot of the current server configuration.
+    ///
+    /// Verifies that all role and channel IDs still exist in the Discord guild.
+    /// Any IDs that no longer exist are set to `None` in the returned snapshot.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the guild ID cannot be retrieved or if the HTTP requests to
+    /// retrieve guild roles or channels fail.
     pub async fn snaphot(self, ctx: &Context<'_>) -> Self {
         let mut snapshot = self.clone();
         let guild_id = ctx.guild_id().unwrap();
@@ -437,7 +520,6 @@ mod test {
         pub static ref UNIVERSE_ID: ObjectId = ObjectId::new();
     }
 
-    /// Helper inserting a Universe document required by server tests.
     async fn insert_universe() -> Result<InsertOneResult, String> {
         let _ = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await;
         let universe = Universe {
