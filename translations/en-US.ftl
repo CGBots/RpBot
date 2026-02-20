@@ -264,16 +264,71 @@ create_place__server_not_found = Unknown server
     .message = The server does not appear to be registered. Run /{$universe} {$add_server} [setup type]
 create_place__database_not_found = Database not found
     .title = Connection failed
-    .description = The database connection failed.
+    .message = The database connection failed.
             Please try again or contact support if the problem persists: {$support}
 create_place__role_not_created = Role creation failed
     .title = Role creation failed
-    .description = The place role could not be created correctly.
+    .message = The place role could not be created correctly.
             Please try again or contact support if the problem persists: {$support}
 create_place__rollback_complete = Rollback completed
     .title = Rollback performed
-    .description = Something went wrong during place creation. A rollback has been performed.
+    .message = Something went wrong during place creation. A rollback has been performed.
 create_role__rollback_failed = Rollback failed
     .title = Rollback failed
-    .description = Something went wrong during place creation and the rollback failed.
+    .message = Something went wrong during place creation and the rollback failed.
             Please contact support: {$support}
+create_place__success = Place created
+    .title = Place created
+    .message = The place has been successfully created.
+
+#Create road
+create_road = create_road
+    .description = Command to create a new road between 2 places
+    .place_one = place_one
+    .place_one-description = First end of the road
+    .place_two = place_two
+    .place_two-description = Second end of the road
+    .distance = distance
+    .distance-description = Distance between the two places in Km.
+create_road__server_not_found = Server not found
+    .title = Server not found
+    .message = The server does not appear to be registered. Run /{$universe} {$add_server} [setup type]
+create_road__database_error = Database error
+    .title = Database error
+    .message = An error occurred while accessing the database.
+                        Please try again or contact support if the problem persists: {$support}
+create_place__place_one_not_found = First place not found
+    .title = First place not found
+    .message = The first specified place was not found in the universe.
+                        Please try again or contact support if the problem persists: {$support}
+create_place__place_two_not_found = Second place not found
+    .title = Second place not found
+    .message = The second specified place was not found in the universe.
+                        Please try again or contact support if the problem persists: {$support}
+create_road__role_creation_failed = Role creation error
+    .title = Role creation error
+    .message = The road role could not be created correctly.
+                        Please try again or contact support if the problem persists: {$support}
+create_road__create_channel_failed_rollback_success = Channel creation error
+    .title = Channel creation error
+    .message = The channel could not be created, but the changes have been rolled back.
+                        Please try again or contact support if the problem persists: {$support}
+create_road__create_channel_failed_rollback_failed = Critical error
+    .title = Critical error
+    .message = Channel creation failed and the rollback could not be performed.
+                        Please contact support: {$support}
+create_road__insert_road_failed_rollback_success = Insertion error
+    .title = Insertion error
+    .message = The road could not be saved, but the changes have been rolled back.
+                        Please try again or contact support if the problem persists: {$support}
+create_road__insert_road_failed_rollback_channel_failed = Critical error
+    .title = Critical error
+    .message = The road registration failed and the channel rollback failed.
+                        Please contact support: {$support}
+create_road__insert_road_failed_rollback_role_failed = Critical error
+    .title = Critical error
+    .message = The road registration failed and the role rollback failed.
+                        Please contact support: {$support}
+create_road__success = Road created
+    .title = Road created
+    .message = The road has been successfully created

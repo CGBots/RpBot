@@ -9,6 +9,7 @@ pub mod create_universe_command;
 pub mod setup_command;
 mod create_place;
 mod utility;
+mod create_road_command;
 
 use discord::poise_structs::{Context, Data, Error};
 use crate::database::db_client::constraint;

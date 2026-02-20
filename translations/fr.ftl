@@ -46,7 +46,7 @@ create_universe = nouvel_univers
     .description = Permet de créer un nouvel univers. Un serveur ne peut être rattaché qu'à un univers à la fois.
     .universe_name = nom
     .universe_name-description = Nom du nouvel Univers
-    .setup_type = setup_type
+    .setup_type = type_de_setup
     .setup_type-description = Type de configuration pour ce serveur
 create_universe__check_universe_limit_failed = Échec de la vérification de la limite d'univers
     .title = Erreur de vérification
@@ -264,16 +264,71 @@ create_place__server_not_found = Serveur inconnu
     .message = Le serveur semble ne pas être enregistré. Faites /{$universe} {$add_server} [type de setup]
 create_place__database_not_found = Base de données introuvable
     .title = Connexion échouée
-    .description = La connexion à la base de donénes à échouée.
+    .message = La connexion à la base de donénes à échouée.
             Veuillez ressayer ou contacter le support si le problème persiste: {$support}
 create_place__role_not_created = Création de rôle échouée
     .title = Création de rôle échouée
-    .description = Le rôle du lieu n'as pas pu être créé correctement.
+    .message = Le rôle du lieu n'as pas pu être créé correctement.
             Veuillez ressayer ou contacter le support si le problème persiste: {$support}
 create_place__rollback_complete = Rollback terminé
     .title = Rollback effectué
-    .description = Quelque chose s'est mal passé durant la création du lieu. Un rollback à été effectué.
+    .message = Quelque chose s'est mal passé durant la création du lieu. Un rollback à été effectué.
 create_role__rollback_failed = Rollback échoué
     .title = Rollback échoué
-    .description = Quelque chose s'est mal passé durant la création du lieu et le rollback à échoué.
+    .message = Quelque chose s'est mal passé durant la création du lieu et le rollback à échoué.
             Veuillez contacter le support: {$support}
+create_place__success = Place créée
+    .title = Place créée
+    .message = La place à été créée avec succès.
+
+#Create road
+create_road = nouvelle_route
+    .description = Commande pour créer une nouvelle route entre 2 lieux
+    .place_one = lieu_un
+    .place_one-description = Première extrémité de la route
+    .place_two = lieu_deux
+    .place_two-description = Seconde extrémité de la route
+    .distance = distance
+    .distance-description = Distance séparant les deux lieux en Km.
+create_road__server_not_found = Serveur introuvable
+    .title = Serveur introuvable
+    .message = Le serveur ne semble pas être enregistré. Faites /{$universe} {$add_server} [type de setup]
+create_road__database_error = Erreur de base de données
+    .title = Erreur de base de données
+    .message = Une erreur s'est produite lors de l'accès à la base de données.
+            Veuillez ressayer ou contacter le support si le problème persiste: {$support}
+create_place__place_one_not_found = Premier lieu introuvable
+    .title = Premier lieu introuvable
+    .message = Le premier lieu spécifié n'a pas été trouvé dans l'univers.
+            Veuillez ressayer ou contacter le support si le problème persiste: {$support}
+create_place__place_two_not_found = Second lieu introuvable
+    .title = Second lieu introuvable
+    .message = Le second lieu spécifié n'a pas été trouvé dans l'univers.
+            Veuillez ressayer ou contacter le support si le problème persiste: {$support}
+create_road__role_creation_failed = Erreur de création de rôle
+    .title = Erreur de création de rôle
+    .message = Le rôle de la route n'a pas pu être créé correctement.
+            Veuillez ressayer ou contacter le support si le problème persiste: {$support}
+create_road__create_channel_failed_rollback_success = Erreur de création de salon
+    .title = Erreur de création de salon
+    .message = Le salon n'a pas pu être créé, mais les modifications ont été annulées.
+            Veuillez ressayer ou contacter le support si le problème persiste: {$support}
+create_road__create_channel_failed_rollback_failed = Erreur critique
+    .title = Erreur critique
+    .message = La création du salon a échoué et le rollback n'a pas pu être effectué.
+            Veuillez contacter le support: {$support}
+create_road__insert_road_failed_rollback_success = Erreur d'insertion
+    .title = Erreur d'insertion
+    .message = La route n'a pas pu être sauvegardée, mais les modifications ont été annulées.
+            Veuillez ressayer ou contacter le support si le problème persiste: {$support}
+create_road__insert_road_failed_rollback_channel_failed = Erreur critique
+    .title = Erreur critique
+    .message = L'enregistrement de la route a échoué et l'annulation du salon a échoué.
+            Veuillez contacter le support: {$support}
+create_road__insert_road_failed_rollback_role_failed = Erreur critique
+    .title = Erreur critique
+    .message = L'enregistrement de la route a échoué et l'annulation du rôle a échoué.
+            Veuillez contacter le support: {$support}
+create_road__success = Route créée
+    .title = Route créée
+    .message = La route a été créée avec succès

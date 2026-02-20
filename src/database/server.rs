@@ -214,25 +214,6 @@ impl Server {
             .await
     }
 
-    /// Retrieves a server configuration by Discord guild ID.
-    ///
-    /// # Errors
-    ///
-    /// Returns a MongoDB error if the query fails.
-    pub async fn get_server_by_id(
-        server_id: u64,
-    ) -> mongodb::error::Result<Option<Server>> {
-        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
-        let filter = doc! { "server_id": server_id.to_string() };
-        db_client
-            .database(RPBOT_DB_NAME)
-            // NOTE: The original code used UNIVERSE_COLLECTION_NAME here.
-            // It is likely that the correct collection is `SERVER_COLLECTION_NAME`.
-            .collection::<Server>(SERVER_COLLECTION_NAME)
-            .find_one(filter)
-            .await
-    }
-
     /// Updates this server configuration in the database.
     ///
     /// Uses the `_id` field to locate and update the document.
@@ -504,6 +485,25 @@ impl Server {
 
         snapshot
     }
+}
+
+/// Retrieves a server configuration by Discord guild ID.
+///
+/// # Errors
+///
+/// Returns a MongoDB error if the query fails.
+pub async fn get_server_by_id(
+    server_id: u64,
+) -> mongodb::error::Result<Option<Server>> {
+    let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+    let filter = doc! { "server_id": server_id.to_string() };
+    db_client
+        .database(RPBOT_DB_NAME)
+        // NOTE: The original code used UNIVERSE_COLLECTION_NAME here.
+        // It is likely that the correct collection is `SERVER_COLLECTION_NAME`.
+        .collection::<Server>(SERVER_COLLECTION_NAME)
+        .find_one(filter)
+        .await
 }
 
 #[cfg(test)]

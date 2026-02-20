@@ -66,9 +66,7 @@ pub async fn reply<'a>(
             CreateEmbed::new()
                 .title(crate::translation::get(ctx, &string, Some("title"), None))
                 .description(crate::translation::get(ctx, &string, Some("message"), None))
-                .footer(
-                    CreateEmbedFooter::new(string.clone())
-                )
+                .footer(CreateEmbedFooter::new(string.clone()))
                 .color(color),
         ),
     )

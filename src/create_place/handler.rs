@@ -1,7 +1,7 @@
 use serenity::all::{CreateChannel, EditRole, PermissionOverwrite, PermissionOverwriteType, Permissions, RoleId};
 use serenity::all::ChannelType::Category;
 use crate::database::places::Place;
-use crate::database::server::Server;
+use crate::database::server::{get_server_by_id, Server};
 use crate::discord::poise_structs::{Context, Error};
 use crate::utility::reply::reply;
 
@@ -58,7 +58,7 @@ pub async fn create_place(ctx: Context<'_>, name: String) -> Result<(), Error>{
 /// ```
 pub async fn _create_place(ctx: &Context<'_>, name: String) -> Result<&'static str, Error>{
     let guild_id = ctx.guild_id().unwrap();
-    let result = Server::get_server_by_id(guild_id.get()).await;
+    let result = get_server_by_id(guild_id.get()).await;
     let server = match result {
         Ok(universe_result) => {
             match universe_result{
@@ -72,10 +72,7 @@ pub async fn _create_place(ctx: &Context<'_>, name: String) -> Result<&'static s
     let new_role = EditRole::new()
         .name(name.clone())
         .position(0)
-        .audit_log_reason("Create new place")
-        .permissions(
-            Permissions::VIEW_CHANNEL
-        );
+        .audit_log_reason("Create new place");
 
     let mut role = match guild_id.create_role(ctx, new_role).await {
         Ok(role) => {role}

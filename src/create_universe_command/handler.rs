@@ -2,7 +2,7 @@ use crate::add_server_to_universe_command::handler::add_server;
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::database::universe::{Universe};
 use crate::discord::poise_structs::*;
-use crate::database::server::{Server};
+use crate::database::server::{get_server_by_id, Server};
 use crate::database::stats::{Stat, SPEED_STAT};
 use crate::database::stats::StatValue::Int;
 use crate::setup_command::handler::{setup, SetupType, _setup};
@@ -142,7 +142,7 @@ pub async fn _create_universe(
 
     if !result { return Err("create_universe__universe_limit_reached".into()); }
 
-    let Ok(server) = Server::get_server_by_id(ctx.guild_id().unwrap().get()).await
+    let Ok(server) = get_server_by_id(ctx.guild_id().unwrap().get()).await
         else {return Err("create_universe__get_server_failed".into())};
 
     if server.is_some(){ return Err("create_universe__already_exist_for_this_server".into()) }

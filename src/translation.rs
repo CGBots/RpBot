@@ -419,7 +419,9 @@ pub fn apply_translations(
                     if let Some(p_name) = format(bundle, &original_name, Some(&param.name), None) {
                         param.name_localizations.insert(locale.clone(), p_name);
                     }
-                    if let Some(p_desc) = format(bundle, &original_name, Some(&format!("{}-description", param.name)), None) {
+                    if let Some(p_desc) =
+                        format(bundle, &original_name, Some(&format!("{}-description", param.name)), None)
+                    {
                         param.description_localizations.insert(locale.clone(), p_desc);
                     }
                     for choice in &mut param.choices {
@@ -441,22 +443,27 @@ pub fn apply_translations(
 
             for param in &mut command.parameters {
                 let original_param_name = param.name.clone();
+
+                // IMPORTANT: do not overwrite param.name (internal option name)
                 if let Some(p_name) = format(bundle, &original_name, Some(&original_param_name), None) {
-                    param.name = p_name;
+                    param.name_localizations.insert("en-US".to_string(), p_name);
                 }
-                if let Some(p_desc) = format(bundle, &original_name, Some(&format!("{}-description", original_param_name)), None) {
+
+                if let Some(p_desc) =
+                    format(bundle, &original_name, Some(&format!("{}-description", original_param_name)), None)
+                {
                     param.description = Some(p_desc);
                 }
 
+                // IMPORTANT: do not overwrite choice.name (internal choice key)
                 for choice in &mut param.choices {
                     if let Some(c_name) = format(bundle, &choice.name, None, None) {
-                        choice.name = c_name;
+                        choice.localizations.insert("en-US".to_string(), c_name);
                     }
                 }
             }
         }
 
-        // Recursively apply to subcommands
         if !command.subcommands.is_empty() {
             apply_translations(translations, &mut command.subcommands);
         }

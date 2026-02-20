@@ -1,6 +1,6 @@
 use poise::{CreateReply};
 use serenity::all::{ButtonStyle, Color, ComponentInteractionCollector, CreateActionRow, CreateButton, CreateEmbed};
-use crate::database::server::Server;
+use crate::database::server::{get_server_by_id, Server};
 use crate::discord::poise_structs::{Context, Error};
 use crate::tr;
 use crate::setup_command::full_setup::full_setup;
@@ -107,7 +107,7 @@ pub async fn setup(ctx: Context<'_>, setup_type: SetupType) -> Result<(), Error>
 pub async fn _setup(ctx: &Context<'_>, setup_type: SetupType) -> Result<&'static str, Error> {
     let guild_id = ctx.guild_id().unwrap();
 
-    let Some(mut server) = Server::get_server_by_id(guild_id.get()).await? else { return Err("setup__server_not_found".into()) };
+    let Some(mut server) = get_server_by_id(guild_id.get()).await? else { return Err("setup__server_not_found".into()) };
     let server_snapshot = server.clone().snaphot(ctx).await;
 
     if server.admin_role_id.is_some()
