@@ -8,12 +8,12 @@ ping = ping
 start = start
     .description = Affiche les instruction de démarrage dans le salon actuel.
 start_message = Start Message
-    .title = Merci d'utiliser VerseEngine !
+    .title = Merci d'utiliser
     .message = Pour commencer à utiliser le bot, commencez par créer un nouvel univers.
     Utilisez la commande `/{$universe} {$create_universe} [nom de votre univers] [type de setup]`
     Le type de setup détermine quels salons seront créés.
     Dans un setup partiel, seule la catégorie route et les rôles seront créés.
-    Dans un setup complet, les catégories Admin, hor rp, rp et leurs selons sont également créés en plus.
+    Dans un setup complet, les catégories Admin, hors rp, rp et leurs selons sont également créés en plus.
 
 #Stats
 stat_insert__failed = Échec de l'insertion des statistiques

@@ -8,7 +8,7 @@ ping = ping
 start = start
     .description = Displays startup instructions in the current channel.
 start_message = Start Message
-    .title = Thank you for using VerseEngine!
+    .title = Thank you for using 
     .message = To start using the bot, begin by creating a new universe.
             Use the command `/{$universe} {$create_universe} [your universe name] [setup type]`
             The setup type determines which channels will be created.

@@ -3,8 +3,8 @@ use serenity::all::{ButtonStyle, Color, ComponentInteractionCollector, CreateAct
 use crate::database::server::{get_server_by_id, Server};
 use crate::discord::poise_structs::{Context, Error};
 use crate::tr;
-use crate::setup_command::full_setup::full_setup;
-use crate::setup_command::partial_setup::partial_setup;
+use crate::universe::setup::full_setup::full_setup;
+use crate::universe::setup::partial_setup::partial_setup;
 use crate::utility::reply::reply;
 
 ///  * Enum representing the type of setup to be performed.

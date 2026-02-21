@@ -1,6 +1,9 @@
+use log::log;
 use poise::CreateReply;
+use serenity::all::{Color, CreateEmbed, CreateEmbedFooter};
 use crate::discord::poise_structs::{Context, Error};
 use crate::translation::tr;
+use crate::utility::reply::reply;
 
 /// Starts an administrator-only guild slash command.
 ///
@@ -31,6 +34,14 @@ use crate::translation::tr;
 /// ```
 #[poise::command(slash_command, required_permissions = "ADMINISTRATOR", guild_only)]
 pub async fn start(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.send(CreateReply::default().content(tr!(ctx, "start_message"))).await.unwrap();
+    let _ = ctx.send(
+        CreateReply::default().embed(
+            CreateEmbed::new()
+                .title(crate::translation::get(ctx, "start_message", Some("title"), None) + " VerseEngine")
+                .description(crate::translation::get(ctx, "start_message", Some("message"), None))
+                .footer(CreateEmbedFooter::new("start_message"))
+                .color(Color::from_rgb(0x6f, 0x00, 0xff))
+        ),
+    ).await;
     Ok(())
 }

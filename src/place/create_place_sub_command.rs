@@ -5,11 +5,6 @@ use crate::database::server::{get_server_by_id, Server};
 use crate::discord::poise_structs::{Context, Error};
 use crate::utility::reply::reply;
 
-#[poise::command(slash_command, subcommands("create_place"), subcommand_required)]
-pub async fn place(ctx: Context<'_>) -> Result<(), Error>{
-    Ok(())
-}
-
 #[poise::command(slash_command, required_permissions= "ADMINISTRATOR", guild_only)]
 pub async fn create_place(ctx: Context<'_>, name: String) -> Result<(), Error>{
     ctx.defer().await?;

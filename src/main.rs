@@ -4,12 +4,10 @@ mod database;
 mod discord;
 mod bson_modifiers;
 mod start_command;
-pub mod add_server_to_universe_command;
-pub mod create_universe_command;
-pub mod setup_command;
-mod create_place;
+pub mod universe;
 mod utility;
-mod create_road_command;
+mod place;
+mod roads;
 
 use discord::poise_structs::{Context, Data, Error};
 use crate::database::db_client::constraint;

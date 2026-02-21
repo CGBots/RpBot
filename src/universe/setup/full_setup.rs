@@ -1,7 +1,7 @@
 use crate::database::server::Server;
 use crate::discord::poise_structs::{Context, Error};
-use crate::setup_command::complementary_setup::complementary_setup;
-use crate::setup_command::partial_setup::partial_setup;
+use crate::universe::setup::complementary_setup::complementary_setup;
+use crate::universe::setup::partial_setup::partial_setup;
 
 /// Performs a complete asynchronous setup of the server by sequentially running the
 /// `partial_setup` and `complementary_setup` functions. If both steps succeed, it returns

@@ -7,12 +7,6 @@ use crate::database::road::Road;
 use crate::database::server::{get_server_by_id};
 use crate::discord::poise_structs::{Context, Error};
 use crate::utility::reply::reply;
-
-#[poise::command(slash_command, subcommands("create_road"), subcommand_required)]
-pub async fn road(ctx: Context<'_>) -> Result<(), Error>{
-    Ok(())
-}
-
 #[poise::command(slash_command, required_permissions= "ADMINISTRATOR", guild_only)]
 pub async fn create_road(
     ctx: Context<'_>,

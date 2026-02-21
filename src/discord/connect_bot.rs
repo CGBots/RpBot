@@ -11,13 +11,13 @@ use serenity::all::GatewayIntents;
 use serenity::Client;
 use serenity::client::ClientBuilder;
 use crate::{translation};
-use crate::create_place::handler::place;
-use crate::create_road_command::handler::road;
-use crate::create_universe_command::handler::universe;
+use crate::place::place;
+use crate::roads::road;
 use crate::discord::handler::Handler;
 use crate::ping_command::handler::ping;
 use crate::start_command::handler::start;
 use crate::discord::poise_structs::Data;
+use crate::universe::universe;
 
 #[cfg(not(test))]
 static SHARD_NUMBER: u32 = 1;
