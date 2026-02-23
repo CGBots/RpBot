@@ -1,6 +1,6 @@
 use crate::discord::poise_structs::{Context, Error};
 use crate::tr;
-use crate::database::universe::Universe;
+use crate::database::universe::{get_universe_by_id, get_universe_by_server_id, Universe};
 use poise::CreateReply;
 use serenity::all::CreateSelectMenu;
 use serenity::all::CreateSelectMenuKind;
@@ -62,7 +62,7 @@ pub async fn _add_server(ctx: &Context<'_>, setup_type: SetupType) -> Result<&'s
             if let Some(selected) = values.get(0) {
                 let _ = message.delete(*ctx).await;
 
-                let Some(universe) = Universe::get_universe_by_id(selected.to_string()).await? else {return Err("placeholder".into())};
+                let Some(universe) = get_universe_by_id(selected.to_string()).await? else {return Err("placeholder".into())};
 
                 let res = universe.clone().check_server_limit().await?;
 
@@ -135,7 +135,7 @@ pub async fn _add_server(ctx: &Context<'_>, setup_type: SetupType) -> Result<&'s
 /// Note: This function relies on the `Universe::get_universe_by_server_id` method to fetch
 /// universe details asynchronously.
 pub async fn check_server_in_universe(guild_id: u64) -> Result<Universe, String>{
-    if let Ok(cursor) = Universe::get_universe_by_server_id(guild_id).await {
+    if let Ok(cursor) = get_universe_by_server_id(guild_id).await {
         if let Some(universe) = cursor{
             return Ok(universe);
         }

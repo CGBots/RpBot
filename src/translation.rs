@@ -20,15 +20,20 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::path::Path;
-use crate::{Context, Data, Error};
+use crate::{translation, Context, Data, Error};
 use fluent::{FluentArgs, FluentValue};
 use fluent::bundle::FluentBundle;
 use fluent::FluentResource;
 use intl_memoizer::concurrent::IntlLangMemoizer;
+use lazy_static::lazy_static;
 use regex::Regex;
 
 /// Type alias for a Fluent bundle with concurrent memoization
 type Bundle = FluentBundle<FluentResource, IntlLangMemoizer>;
+
+lazy_static!(
+    pub static ref TRANSLATIONS: Translations = read_ftl().expect("failed to read translation files");
+);
 
 /// A structure that holds translation bundles for managing multilingual support.
 ///
@@ -140,8 +145,83 @@ macro_rules! tr {
         $crate::translation::smart_tr($ctx, $id, None).unwrap_or_else(|_| $id.to_string())
     }};
 }
+
+/// A macro for performing translations using Fluent-based argument substitution with explicit locale.
+///
+/// This macro provides a way to localize strings based on a locale string (e.g., "en-US") and
+/// an identifier (`$id`), with optional arguments. Unlike `tr!`, this macro works with serenity
+/// contexts that don't support the `smart_tr` function, requiring only a translations reference
+/// and a locale string.
+///
+/// # Syntax
+/// ```
+/// tr_locale!(translations, locale, id);
+/// tr_locale!(translations, locale, id, argname: value, ...);
+/// ```
+///
+/// - When called with `translations`, `locale`, and `id`, it attempts to fetch the associated
+///   translation from the Fluent resources for that locale.
+/// - When called with additional arguments in the form `argname: value`, it substitutes
+///   placeholders in the translation with the specified values.
+///
+/// # Parameters
+///
+/// - `$translations:expr`
+///   A reference to the `Translations` structure containing translation bundles.
+///
+/// - `$locale:expr`
+///   The locale string (e.g., "en-US", "fr", "es") identifying which translation to use.
+///
+/// - `$id:expr`
+///   The identifier for the translation resource.
+///
+/// - `$argname:ident`
+///   (Optional) The name of a placeholder in the translation string.
+///
+/// - `$argvalue:expr`
+///   (Optional) The value for the given placeholder.
+///
+/// # Returns
+///
+/// Returns a `String` that contains the localized version of the input identifier with
+/// placeholders substituted. If the translation fails or the identifier is not found,
+/// the untranslated identifier (`$id`) is returned.
+///
+/// # Examples
+///
+/// Basic usage:
+/// ```rust
+/// let translation = tr_locale!(&translations, "en-US", "hello_world");
+/// assert_eq!(translation, "Hello, World!");
+/// ```
+///
+/// With arguments:
+/// ```rust
+/// let translation = tr_locale!(&translations, "en-US", "welcome_user", username: "Alice");
+/// assert_eq!(translation, "Welcome, Alice!");
+/// ```
+///
+/// Fallback to identifier if translation not found:
+/// ```
+/// let translation = tr_locale!(&translations, "en-US", "unknown_key");
+/// assert_eq!(translation, "unknown_key");
+/// ```
+#[macro_export]
+macro_rules! tr_locale {
+    ( $locale:expr, $id:expr $(, $argname:ident: $argvalue:expr )* $(,)? ) => {{
+        #[allow(unused_mut)]
+        let mut args = fluent::FluentArgs::new();
+        $( args.set(stringify!($argname), $argvalue); )*
+        $crate::translation::get_by_locale($locale, $id, None, Some(&args))
+    }};
+    ( $locale:expr, $id:expr ) => {{
+        $crate::translation::get_by_locale($locale, $id, None, None)
+    }};
+}
 #[allow(unused_imports)]
 pub(crate) use tr;
+
+
 
 /// Formats a Fluent message or attribute into a localized string.
 ///
@@ -265,6 +345,53 @@ pub fn get(
             tracing::warn!("Unknown Fluent message identifier `{}`", id);
             id.to_string()
         })
+}
+
+/// Retrieves a localized string based on the given identifier, locale, and optional attributes or arguments.
+///
+/// This function attempts to fetch a translation string from the provided translations for a specific
+/// locale string (e.g., "en-US"). If the locale-specific translation is not found, it falls back to
+/// the main/default translation resource. If neither is available, it returns the identifier itself.
+///
+/// # Arguments
+///
+/// * `translations` - A reference to the `Translations` struct containing translation bundles.
+/// * `locale` - A string slice identifying the locale (e.g., "en-US", "fr", "es").
+/// * `id` - A string slice identifying the translation message.
+/// * `attr` - An optional attribute to retrieve a specific variant of the translation (can be `None`).
+/// * `args` - An optional set of arguments of type `FluentArgs` to interpolate into the message (can be `None`).
+///
+/// # Returns
+///
+/// Returns the formatted localized string. If no translation is found, the identifier itself is returned as a fallback.
+///
+/// # Behavior
+///
+/// 1. Fetches the translation resource based on the provided locale from `translations.other`.
+/// 2. Attempts to format the string using the locale-specific bundle.
+/// 3. Falls back to the main translation resource if the locale-specific resource is not found.
+/// 4. Returns the `id` as the fallback value if the translation is missing.
+///
+/// # Example
+///
+/// ```rust
+/// let message = get_by_locale(&translations, "en-US", "welcome_message", None, None);
+/// println!("{}", message);
+/// ```
+///
+/// In this example, the function attempts to retrieve the `welcome_message` string for the "en-US"
+/// locale and outputs it to the console. If unavailable, it will return `"welcome_message"` as the fallback.
+pub fn get_by_locale(
+    locale: &str,
+    id: &str,
+    attr: Option<&str>,
+    args: Option<&FluentArgs<'_>>,
+) -> String {
+    TRANSLATIONS.other
+        .get(locale)
+        .and_then(|bundle| format(bundle, id, attr, args))
+        .or_else(|| format(&TRANSLATIONS.main, id, attr, args))
+        .unwrap_or_else(|| id.to_string())
 }
 
 /// Reads Fluent translation files from the "translations" directory and returns a `Translations` object.

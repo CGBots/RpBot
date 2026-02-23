@@ -6,7 +6,7 @@ use crate::discord::poise_structs::Context;
 ///
 /// # Arguments
 /// - `everyone_role_id` - The `RoleId` representing the "everyone" role, which typically includes all users in the server.
-/// - `player_role_id` - The `RoleId` representing the "player" role to restrict access for players.
+/// - `player_role_id` - The `RoleId` representing the "player" role to restrict access for characters.
 /// - `spectator_role_id` - The `RoleId` representing the "spectator" role to grant access for spectators.
 /// - `moderator_role_id` - The `RoleId` representing the "moderator" role to grant access for moderators.
 ///

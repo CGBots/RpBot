@@ -1,14 +1,15 @@
 use futures::TryStreamExt;
 use crate::database::db_client::{DB_CLIENT, connect_db};
-use crate::database::db_namespace::{RPBOT_DB_NAME, SERVER_COLLECTION_NAME, STATS_COLLECTION_NAME, UNIVERSE_COLLECTION_NAME};
+use crate::database::db_namespace::{PLAYER_COLLECTION_NAME, RPBOT_DB_NAME, SERVER_COLLECTION_NAME, STATS_COLLECTION_NAME, UNIVERSE_COLLECTION_NAME};
 use mongodb::bson::{doc, from_document};
 use mongodb::bson::oid::ObjectId;
-use mongodb::IndexModel;
+use mongodb::{Cursor, IndexModel};
 use mongodb::options::{IndexOptions};
 use mongodb::results::{CreateIndexResult, InsertOneResult};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use tokio::join;
+use crate::database::players::Character;
 use crate::database::server::{Server};
 use crate::database::stats::Stat;
 use crate::discord::poise_structs::Error;
@@ -65,93 +66,6 @@ pub struct Universe {
 }
 
 impl Universe {
-    /// Retrieves a `Universe` document by its associated `server_id` from a MongoDB database.
-    ///
-    /// The function performs the following steps:
-    /// 1. Establishes a connection to the database if it hasn't already been initialized.
-    /// 2. Builds an aggregation pipeline that:
-    ///    - Matches the server document with the provided `server_id`.
-    ///    - Performs a `$lookup` operation to join the `Server` collection with the `Universe` collection
-    ///      based on the `universe_id` field.
-    ///    - Uses `$unwind` to flatten the resulting array of joined universe data.
-    /// 3. Executes the aggregation pipeline and processes the resulting cursor to extract the universe information.
-    ///
-    /// # Arguments
-    /// * `server_id` - A `u64` representing the ID of the server.
-    ///
-    /// # Returns
-    /// - `Ok(Some(Universe))` if a matching universe is found.
-    /// - `Ok(None)` if no matching server or universe is found.
-    /// - Returns an error (`mongodb::error::Result`) for any database or deserialization issues.
-    ///
-    /// # Errors
-    /// This function may return an error if:
-    /// - Connection to the database fails.
-    /// - The aggregation process encounters issues.
-    /// - Document deserialization fails due to schema mismatches.
-    ///
-    /// # MongoDB Collections
-    /// - `SERVER_COLLECTION_NAME`: The collection containing server documents.
-    /// - `UNIVERSE_COLLECTION_NAME`: The collection containing universe documents.
-    ///
-    /// # Example
-    /// ```rust
-    /// let server_id = 123456789;
-    /// match get_universe_by_server_id(server_id).await {
-    ///     Ok(Some(universe)) => println!("Universe found: {:?}", universe),
-    ///     Ok(None) => println!("No universe found for the provided server ID."),
-    ///     Err(e) => eprintln!("Error occurred: {:?}", e),
-    /// }
-    /// ```
-    ///
-    /// # Dependencies
-    /// This function depends on the following:
-    /// - `mongodb` crate for database interaction.
-    /// - `futures` for asynchronous streams and utilities.
-    /// - A `Server` document schema and `Universe` document schema.
-    /// - Helper functions:
-    ///   - `connect_db()`: For initializing the database client.
-    ///   - `from_document()`: For deserializing documents into Rust data structures.
-    ///
-    /// # Notes
-    /// - The `DB_CLIENT` is assumed to be a globally available static reference to the MongoDB client initialized using `tokio::sync::OnceCell`.
-    /// - Ensure the `UNIVERSE_COLLECTION_NAME` and `RPBOT_DB_NAME` constants are configured correctly to match the database schema.
-    pub async fn get_universe_by_server_id(
-        server_id: u64,
-    ) -> mongodb::error::Result<Option<Universe>> {
-        let db_client = DB_CLIENT
-            .get_or_init(|| async { connect_db().await.unwrap() })
-            .await
-            .clone();
-
-        let pipeline = vec![
-            doc! { "$match": { "server_id": server_id.to_string() } },
-            doc! { "$lookup": {
-            "from": UNIVERSE_COLLECTION_NAME,   // the UNIVERSE collection
-            "localField": "universe_id",        // field in SERVER
-            "foreignField": "_id",              // field in UNIVERSE
-            "as": "universe"
-        }},
-            doc! { "$unwind": "$universe" }         // flatten the array
-        ];
-
-        let mut cursor = db_client
-            .database(RPBOT_DB_NAME)
-            .collection::<Server>(SERVER_COLLECTION_NAME)
-            .aggregate(pipeline)
-            .await?;
-
-
-        if let Some(doc) = cursor.try_next().await? {
-            // Extract the joined universe document
-            let universe_doc = doc.get_document("universe").unwrap();
-            let universe: Universe = from_document(universe_doc.clone())?;
-            return Ok(Some(universe));
-        }
-
-        Ok(None)
-    }
-
     /// Inserts the current `Universe` instance into the MongoDB collection.
     ///
     /// # Returns
@@ -347,67 +261,6 @@ impl Universe {
             .await
     }
 
-    /// Asynchronously retrieves a `Universe` document from the database by its unique identifier.
-    ///
-    /// # Arguments
-    ///
-    /// * `universe_id` - A `String` representing the unique identifier of the universe to be retrieved.
-    ///                   This ID should be a valid string representation of a MongoDB ObjectId.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `Result` wrapping an `Option<Universe>`.
-    /// * `Ok(Some<Universe>)` - If a document with the specified ID exists in the database.
-    /// * `Ok(None)` - If no document was found with the specified ID.
-    /// * `Err(mongodb::error::Error)` - If an error occurs during the database operation.
-    ///
-    /// # Errors
-    ///
-    /// This function can fail in the following scenarios:
-    /// * If the provided `universe_id` is not a valid ObjectId format.
-    /// * If the database connection fails to initialize.
-    /// * If the database query encounters an error.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if the `ObjectId` parsing error (`object_id.unwrap()`) is not properly handled.
-    /// It is recommended to handle the error instead of unwrapping.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use crate::get_universe_by_id;
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let universe_id = "645aef1234567890abcdef12".to_string();
-    ///
-    ///     match get_universe_by_id(universe_id).await {
-    ///         Ok(Some(universe)) => println!("Universe found: {:?}", universe),
-    ///         Ok(None) => println!("No universe found with the given ID."),
-    ///         Err(err) => eprintln!("Error occurred: {}", err),
-    ///     }
-    /// }
-    /// ```
-    ///
-    /// # Notes
-    ///
-    /// * This function uses a singleton pattern with `DB_CLIENT` to manage the MongoDB connection.
-    /// * Ensure that `connect_db()`, `RPBOT_DB_NAME`, and `UNIVERSE_COLLECTION_NAME` are properly configured.
-    /// * The database client and collections should match the expected schema for the `Universe` struct.
-    pub async fn get_universe_by_id(
-        universe_id: String,
-    ) -> mongodb::error::Result<Option<Universe>> {
-        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
-        let object_id = ObjectId::parse_str(&universe_id).map_err(|e| println!("{}", e));
-        let filter = doc! { "_id": object_id.unwrap() };
-        db_client
-            .database(RPBOT_DB_NAME)
-            .collection::<Universe>(UNIVERSE_COLLECTION_NAME)
-            .find_one(filter)
-            .await
-    }
-
     /// Creates a deep copy of the current instance of the object.
     ///
     /// # Returns
@@ -486,7 +339,7 @@ impl Universe {
     /// ```
     #[allow(unused)]
     pub async fn check_universe_ownership(server_id: u64, user_id: u64) -> Result<bool, String> {
-        let result = Self::get_universe_by_server_id(server_id).await;
+        let result = get_universe_by_server_id(server_id).await;
         match result {
             Ok(cursor) => {
                 match cursor {
@@ -662,13 +515,188 @@ impl Universe {
 
         Ok(true)
     }
+
+    pub async fn get_stats(self) -> mongodb::error::Result<Cursor<Stat>>{
+        let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }) .await .clone();
+        db_client
+            .database(self.universe_id.to_string().as_str())
+            .collection::<Stat>(STATS_COLLECTION_NAME)
+            .find(doc!{})
+            .await
+    }
+
+    pub async fn get_player_by_user_id(self, user_id: u64) -> mongodb::error::Result<Option<Character>> {
+        let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }) .await .clone();
+        let filter = doc!{};
+        db_client
+            .database(self.universe_id.to_string().as_str())
+            .collection::<Character>(PLAYER_COLLECTION_NAME)
+            .find_one(filter)
+            .await
+    }
+
+    pub async fn has_character(self, user_id: u64) -> mongodb::error::Result<Option<Character>> {
+        let player_result = self.get_player_by_user_id(user_id).await?;
+        match player_result {
+            None => { Ok(None) }
+            Some(character) => { Ok(Some(character)) }
+        }
+    }
+}
+
+/// Asynchronously retrieves a `Universe` document from the database by its unique identifier.
+///
+/// # Arguments
+///
+/// * `universe_id` - A `String` representing the unique identifier of the universe to be retrieved.
+///                   This ID should be a valid string representation of a MongoDB ObjectId.
+///
+/// # Returns
+///
+/// Returns a `Result` wrapping an `Option<Universe>`.
+/// * `Ok(Some<Universe>)` - If a document with the specified ID exists in the database.
+/// * `Ok(None)` - If no document was found with the specified ID.
+/// * `Err(mongodb::error::Error)` - If an error occurs during the database operation.
+///
+/// # Errors
+///
+/// This function can fail in the following scenarios:
+/// * If the provided `universe_id` is not a valid ObjectId format.
+/// * If the database connection fails to initialize.
+/// * If the database query encounters an error.
+///
+/// # Panics
+///
+/// This function panics if the `ObjectId` parsing error (`object_id.unwrap()`) is not properly handled.
+/// It is recommended to handle the error instead of unwrapping.
+///
+/// # Example
+///
+/// ```rust
+/// use crate::get_universe_by_id;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let universe_id = "645aef1234567890abcdef12".to_string();
+///
+///     match get_universe_by_id(universe_id).await {
+///         Ok(Some(universe)) => println!("Universe found: {:?}", universe),
+///         Ok(None) => println!("No universe found with the given ID."),
+///         Err(err) => eprintln!("Error occurred: {}", err),
+///     }
+/// }
+/// ```
+///
+/// # Notes
+///
+/// * This function uses a singleton pattern with `DB_CLIENT` to manage the MongoDB connection.
+/// * Ensure that `connect_db()`, `RPBOT_DB_NAME`, and `UNIVERSE_COLLECTION_NAME` are properly configured.
+/// * The database client and collections should match the expected schema for the `Universe` struct.
+pub async fn get_universe_by_id(
+    universe_id: String,
+) -> mongodb::error::Result<Option<Universe>> {
+    let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+    let object_id = ObjectId::parse_str(&universe_id).map_err(|e| println!("{}", e));
+    let filter = doc! { "_id": object_id.unwrap() };
+    db_client
+        .database(RPBOT_DB_NAME)
+        .collection::<Universe>(UNIVERSE_COLLECTION_NAME)
+        .find_one(filter)
+        .await
+}
+
+/// Retrieves a `Universe` document by its associated `server_id` from a MongoDB database.
+///
+/// The function performs the following steps:
+/// 1. Establishes a connection to the database if it hasn't already been initialized.
+/// 2. Builds an aggregation pipeline that:
+///    - Matches the server document with the provided `server_id`.
+///    - Performs a `$lookup` operation to join the `Server` collection with the `Universe` collection
+///      based on the `universe_id` field.
+///    - Uses `$unwind` to flatten the resulting array of joined universe data.
+/// 3. Executes the aggregation pipeline and processes the resulting cursor to extract the universe information.
+///
+/// # Arguments
+/// * `server_id` - A `u64` representing the ID of the server.
+///
+/// # Returns
+/// - `Ok(Some(Universe))` if a matching universe is found.
+/// - `Ok(None)` if no matching server or universe is found.
+/// - Returns an error (`mongodb::error::Result`) for any database or deserialization issues.
+///
+/// # Errors
+/// This function may return an error if:
+/// - Connection to the database fails.
+/// - The aggregation process encounters issues.
+/// - Document deserialization fails due to schema mismatches.
+///
+/// # MongoDB Collections
+/// - `SERVER_COLLECTION_NAME`: The collection containing server documents.
+/// - `UNIVERSE_COLLECTION_NAME`: The collection containing universe documents.
+///
+/// # Example
+/// ```rust
+/// let server_id = 123456789;
+/// match get_universe_by_server_id(server_id).await {
+///     Ok(Some(universe)) => println!("Universe found: {:?}", universe),
+///     Ok(None) => println!("No universe found for the provided server ID."),
+///     Err(e) => eprintln!("Error occurred: {:?}", e),
+/// }
+/// ```
+///
+/// # Dependencies
+/// This function depends on the following:
+/// - `mongodb` crate for database interaction.
+/// - `futures` for asynchronous streams and utilities.
+/// - A `Server` document schema and `Universe` document schema.
+/// - Helper functions:
+///   - `connect_db()`: For initializing the database client.
+///   - `from_document()`: For deserializing documents into Rust data structures.
+///
+/// # Notes
+/// - The `DB_CLIENT` is assumed to be a globally available static reference to the MongoDB client initialized using `tokio::sync::OnceCell`.
+/// - Ensure the `UNIVERSE_COLLECTION_NAME` and `RPBOT_DB_NAME` constants are configured correctly to match the database schema.
+pub async fn get_universe_by_server_id(
+    server_id: u64,
+) -> mongodb::error::Result<Option<Universe>> {
+    let db_client = DB_CLIENT
+        .get_or_init(|| async { connect_db().await.unwrap() })
+        .await
+        .clone();
+
+    let pipeline = vec![
+        doc! { "$match": { "server_id": server_id.to_string() } },
+        doc! { "$lookup": {
+            "from": UNIVERSE_COLLECTION_NAME,   // the UNIVERSE collection
+            "localField": "universe_id",        // field in SERVER
+            "foreignField": "_id",              // field in UNIVERSE
+            "as": "universe"
+        }},
+        doc! { "$unwind": "$universe" }         // flatten the array
+    ];
+
+    let mut cursor = db_client
+        .database(RPBOT_DB_NAME)
+        .collection::<Server>(SERVER_COLLECTION_NAME)
+        .aggregate(pipeline)
+        .await?;
+
+
+    if let Some(doc) = cursor.try_next().await? {
+        // Extract the joined universe document
+        let universe_doc = doc.get_document("universe").unwrap();
+        let universe: Universe = from_document(universe_doc.clone())?;
+        return Ok(Some(universe));
+    }
+
+    Ok(None)
 }
 
 #[cfg(test)]
 mod test {
     use crate::database::db_client::{connect_db, DB_CLIENT};
     use crate::database::db_namespace::{RPBOT_DB_NAME, UNIVERSE_COLLECTION_NAME};
-    use crate::database::universe::Universe;
+    use crate::database::universe::{get_universe_by_id, get_universe_by_server_id, Universe};
     use mongodb::bson::doc;
     use mongodb::results::{DeleteResult, InsertOneResult};
     use std::time::SystemTime;
@@ -732,7 +760,7 @@ mod test {
     #[tokio::test]
     async fn test_recover_universe_data() {
         let _ = insert_universe().await;
-        let result = Universe::get_universe_by_server_id(1).await;
+        let result = get_universe_by_server_id(1).await;
         delete_previously_setup().await;
         match result {
             Ok(data) => {
@@ -770,7 +798,7 @@ mod test {
             .as_object_id()
             .unwrap()
             .to_hex();
-        let result = Universe::get_universe_by_id(id).await;
+        let result = get_universe_by_id(id).await;
         println!("{:?}", result);
         delete_previously_setup().await;
         match result {

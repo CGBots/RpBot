@@ -6,7 +6,8 @@ use mongodb::results::{InsertOneResult, UpdateResult};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use crate::database::db_client::{DB_CLIENT, connect_db};
-use crate::database::db_namespace::{RPBOT_DB_NAME, SERVER_COLLECTION_NAME};
+use crate::database::db_namespace::{PLAYER_COLLECTION_NAME, RPBOT_DB_NAME, SERVER_COLLECTION_NAME};
+use crate::database::players::Character;
 use crate::discord::poise_structs::{Context, Error};
 
 /// Represents the type of a Discord identifier.
@@ -484,6 +485,24 @@ impl Server {
         }
 
         snapshot
+    }
+
+    pub async fn get_player_by_user_id(self, user_id: u64) -> mongodb::error::Result<Option<Character>> {
+        let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }) .await .clone();
+        let filter = doc!{};
+        db_client
+            .database(self.universe_id.to_string().as_str())
+            .collection::<Character>(PLAYER_COLLECTION_NAME)
+            .find_one(filter)
+            .await
+    }
+
+    pub async fn has_character(self, user_id: u64) -> mongodb::error::Result<Option<Character>> {
+        let player_result = self.get_player_by_user_id(user_id).await?;
+        match player_result {
+            None => { Ok(None) }
+            Some(character) => { Ok(Some(character)) }
+        }
     }
 }
 

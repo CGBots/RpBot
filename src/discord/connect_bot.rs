@@ -11,6 +11,7 @@ use serenity::all::GatewayIntents;
 use serenity::Client;
 use serenity::client::ClientBuilder;
 use crate::{translation};
+use crate::characters::character;
 use crate::place::place;
 use crate::roads::road;
 use crate::discord::handler::Handler;
@@ -86,7 +87,7 @@ pub async fn connect_bot() -> Result<Client, ()>{
     tracing_subscriber::fmt::init();
     
     
-    let mut commands= vec![ping(), universe(), start(), place(), road()];
+    let mut commands= vec![ping(), universe(), start(), place(), road(), character()];
     
     
     let translations = translation::read_ftl().expect("failed to read translation files");

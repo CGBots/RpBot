@@ -1,4 +1,6 @@
 placeholder = Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla eget neque arcu. Integer sed turpis.
+    .title = Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla eget neque arcu. Integer sed turpis.
+    .message = Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla eget neque arcu. Integer sed turpis.
 
 support = contact.cgbots@gmail.com or @cgbots on discord
 
@@ -8,7 +10,7 @@ ping = ping
 start = start
     .description = Displays startup instructions in the current channel.
 start_message = Start Message
-    .title = Thank you for using 
+    .title = Thank you for using
     .message = To start using the bot, begin by creating a new universe.
             Use the command `/{$universe} {$create_universe} [your universe name] [setup type]`
             The setup type determines which channels will be created.
@@ -332,3 +334,56 @@ create_road__insert_road_failed_rollback_role_failed = Critical error
 create_road__success = Road created
     .title = Road created
     .message = The road has been successfully created
+
+#Create character
+create_character = new_character
+    .description = Command to create new character. Limited to 1 per player.
+
+character_modal_title = Create new character
+create_character__delete_character = Cancel
+create_character__submit_character = Submit
+create_character__modify_character = Modify
+create_character__refuse_character = Refuse
+create_character__accept_character = Accept
+character_special_request = Special request
+character_story = Character's story
+character_description = Physical description
+character_name = Character's name
+
+create_character__no_universe_found = Univere not Found
+    .title = Universe not found
+    .message = There are no existing universe for this server.
+create_character__database_error = DB error
+    .title = Check universes failed
+    .message = Unable to check universes.
+    Please try again or contact support if the problem persists: {$support}
+create_character__character_already_existing = Character already exists
+    .title = Character already exist
+    .message = You already have a character. You can't create another one.
+CharacterModal = character_modal
+    .character_name = Name
+    .character_description = Character's description
+    .character_story = Character's story
+    .character_special_request = Special requests
+create_character__submited = Character sent
+    .title = Character sent
+    .message = Character send to verification. Please wait until validation.
+create_place__character_too_long = Character sheet too long
+    .title = Character sheet too long
+    .message = The character sheet is too long to be displayed. Please do something shorter.
+character_instruction = Fill following fields to describe your character.
+    ► All pragraphs fields are limited to 1500 carracters. The whole character sheet mustn't exceed 4000 caracters.
+    ► A 30 minutes timeout is set by security. But you can always send before what you did and recover it.
+    It's done by cliking on modify button to change it before submiting to moderators.
+create_character__timed_out = Timed out
+    .title = Timed out
+    .message = The modal submit timed out.
+create_character__guild_only = Guild only
+    .title = Guild only
+    .message = This command is reserved to guilds.
+create_character__delete_successfull = Canceled
+    .title = Character creation canceled
+    .message = Your character has successfully been cancelled.
+create_character__not_owner = Not owner
+    .title = Not owner
+    .message = You're not the owner of this character. You can't ask to cancel it.

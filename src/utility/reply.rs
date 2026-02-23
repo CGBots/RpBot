@@ -1,6 +1,6 @@
 use log::log;
 use poise::{CreateReply};
-use serenity::all::{Color, CreateEmbed, CreateEmbedFooter};
+use serenity::all::{Color, CreateEmbed, CreateEmbedFooter, CreateMessage};
 use crate::discord::poise_structs::{Context, Error};
 
 /// Sends an embed-based reply to a user based on the result provided, with appropriate styling
@@ -61,8 +61,8 @@ pub async fn reply<'a>(
         Err(error) => (Color::from_rgb(255, 0, 0), error.to_string()),
     };
 
-    match ctx.send(
-        CreateReply::default().embed(
+    match ctx.channel_id().send_message(ctx,
+        CreateMessage::default().embed(
             CreateEmbed::new()
                 .title(crate::translation::get(ctx, &string, Some("title"), None))
                 .description(crate::translation::get(ctx, &string, Some("message"), None))

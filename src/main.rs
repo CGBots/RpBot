@@ -8,6 +8,7 @@ pub mod universe;
 mod utility;
 mod place;
 mod roads;
+mod characters;
 
 use discord::poise_structs::{Context, Data, Error};
 use crate::database::db_client::constraint;

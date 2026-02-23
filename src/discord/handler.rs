@@ -1,13 +1,17 @@
 use poise::{async_trait};
 #[allow(unused_imports)]
-use serenity::all::{ChannelType, CreateChannel, Context, Guild, Ready};
+use poise::serenity_prelude::all::{ChannelType, CreateChannel, Context, Guild, Ready};
 use poise::serenity_prelude::{EventHandler};
 #[cfg(test)] use crate::discord::connect_bot::TEST_PASSED;
 
 #[allow(unused_imports)]
 #[cfg(not(test))] use std::ops::Add;
+use poise::futures_util::SinkExt;
 #[allow(unused_imports)]
 #[cfg(not(test))] use serenity::all::ActivityData;
+use serenity::all::{Color, CreateEmbed, CreateEmbedFooter, Interaction, ModalInteraction};
+use crate::characters::create_character_sub_command::{accept_character, delete_character, modify_character, refuse_character, submit_character, DELETE_CHARACTER_BUTTON_CUSTOM_ID};
+use crate::start_command::handler::start;
 #[allow(unused_imports)]
 use crate::translation::{apply_translations, tr};
 
@@ -70,6 +74,25 @@ impl EventHandler for Handler {
         match TEST_PASSED.lock(){
             Ok(mut mutex) => {mutex.push_front(true)}
             Err(e) => {println!("{:?}", e)}
+        }
+    }
+
+
+
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        match interaction.message_component(){
+            None => {}
+            Some(modal) => {
+                let modal_data = modal.data.custom_id.as_str();
+                match modal_data{
+                    "create_character__delete_character" => { let _ = delete_character(ctx, modal).await;}
+                    "create_character__submit_character" => { let _ = submit_character(ctx, modal).await;}
+                    "create_character__refuse_character" => { let _ = refuse_character(ctx, modal).await;}
+                    "create_character__accept_character" => { let _ = accept_character(ctx, modal).await;}
+                    "create_character__modify_character" => { let _ = modify_character(ctx, modal).await;}
+                    &_ => {}
+                }
+            }
         }
     }
 }

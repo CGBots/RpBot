@@ -336,4 +336,3 @@ impl Stat {
         true
     }
 }
-

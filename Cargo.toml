@@ -3,6 +3,9 @@ name = "RpBot_reborn"
 version = "0.1.0"
 edition = "2024"
 
+[patch.crates-io]
+poise = { path = "../poise" }
+
 [dependencies]
 serenity = "0.12.5"
 poise = "0.6.1"
