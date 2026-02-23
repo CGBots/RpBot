@@ -13,7 +13,7 @@ pub static MODIFY_CHARACTER_BUTTON_CUSTOM_ID: &str = "create_character__modify_c
 pub static DELETE_CHARACTER_BUTTON_CUSTOM_ID: &str = "create_character__delete_character";
 pub static SUBMIT_CHARACTER_BUTTON_CUSTOM_ID: &str = "create_character__submit_character";
 pub static ACCEPT_CHARACTER_BUTTON_CUSTOM_ID: &str = "create_character__accept_character";
-pub static REFUSE_CHARACTER_BUTTON_CUSTOM_ID: &str = "create_character__refuse_character";
+pub static REJECT_CHARACTER_BUTTON_CUSTOM_ID: &str = "create_character__refuse_character";
 
 pub static CHARACTER_NAME: &str = "character_name";
 pub static CHARACTER_DESCRIPTION: &str = "character_description";
@@ -32,7 +32,7 @@ pub async fn create_character(
 pub async fn _create_character(ctx: Context<'_>) -> Result<&'static str, Error>{
     // 2 process qui échangent
     //  validation par les modos/admins
-    //  modification par l'utilisateur
+    //  modification par l'utilisateur DONE
     // la validation ouvre un modal pour demander les stats du joueur.
     // les infos sont enregistrés
     // le role joueur est attribué
@@ -64,7 +64,7 @@ pub async fn _create_character(ctx: Context<'_>) -> Result<&'static str, Error>{
         Context::Application(app_ctx) => app_ctx,
         _ => return Err("create_character__guild_only".into()),
     };
-    
+
     let modal = CreateQuickModal::new(tr!(ctx, CHARACTER_MODAL_TITLE))
         .field(
             CreateInputText::new(InputTextStyle::Short, tr!(ctx, CHARACTER_NAME), CHARACTER_NAME)
@@ -151,14 +151,36 @@ pub async fn submit_character(ctx: SerenityContext, component_interaction: Compo
     let character_user = character.text.as_str();
 
     if user != character_user{
-        let _ = component_interaction.create_response(ctx, CreateInteractionResponse::Message(
+        let _ = component_interaction.create_response(ctx.clone(), CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new().content(tr_locale!(component_interaction.locale.as_str(), "create_character__not_owner")).ephemeral(true)
         )).await?;
     }
 
-    //TODO
+    let buttons = vec![
+        CreateActionRow::Buttons(
+            vec![
+                CreateButton::new(ACCEPT_CHARACTER_BUTTON_CUSTOM_ID).label(tr_locale!(component_interaction.locale.as_str(), ACCEPT_CHARACTER_BUTTON_CUSTOM_ID)).style(ButtonStyle::Success),
+                CreateButton::new(REJECT_CHARACTER_BUTTON_CUSTOM_ID).label(tr_locale!(component_interaction.locale.as_str(), REJECT_CHARACTER_BUTTON_CUSTOM_ID )).style(ButtonStyle::Danger),
+            ]
+        )
+    ];
 
-    Ok("submit_character")
+    let message = component_interaction.message;
+    let embed: CreateEmbed = message.embeds[0].clone().into();
+
+    let result_message =
+        component_interaction.channel_id.edit_message(ctx, message.id, EditMessage::new().embed(
+            embed.color(Color::from_rgb(0, 255, 0))
+        )
+            .components(buttons)
+        ).await;
+
+    match result_message {
+        Ok(_) => {
+            Ok("create_character__submited")
+        }
+        Err(_) => { Err("create_place__character_too_long".into()) }
+    }
 }
 
 pub async fn modify_character(ctx: SerenityContext, component_interaction: ComponentInteraction) -> Result<&'static str, Error> {
