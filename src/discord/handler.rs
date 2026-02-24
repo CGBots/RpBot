@@ -9,11 +9,12 @@ use poise::serenity_prelude::{EventHandler};
 use poise::futures_util::SinkExt;
 #[allow(unused_imports)]
 #[cfg(not(test))] use serenity::all::ActivityData;
-use serenity::all::{Color, CreateEmbed, CreateEmbedFooter, Interaction, ModalInteraction};
-use crate::characters::create_character_sub_command::{accept_character, delete_character, modify_character, refuse_character, submit_character, DELETE_CHARACTER_BUTTON_CUSTOM_ID};
+use serenity::all::{Color, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse, CreateInteractionResponseMessage, Interaction, ModalInteraction};
+use crate::characters::create_character_sub_command::{accept_character, delete_character, modify_character, refuse_character, submit_character};
 use crate::start_command::handler::start;
 #[allow(unused_imports)]
 use crate::translation::{apply_translations, tr};
+use crate::tr_locale;
 
 /// The `Handler` struct serves as a placeholder or marker in this context.
 ///
@@ -84,13 +85,23 @@ impl EventHandler for Handler {
             None => {}
             Some(modal) => {
                 let modal_data = modal.data.custom_id.as_str();
-                match modal_data{
-                    "create_character__delete_character" => { let _ = delete_character(ctx, modal).await;}
-                    "create_character__submit_character" => { let _ = submit_character(ctx, modal).await;}
-                    "create_character__refuse_character" => { let _ = refuse_character(ctx, modal).await;}
-                    "create_character__accept_character" => { let _ = accept_character(ctx, modal).await;}
-                    "create_character__modify_character" => { let _ = modify_character(ctx, modal).await;}
-                    &_ => {}
+                let result = match modal_data {
+                    "create_character__delete_character" => delete_character(ctx.clone(), modal.clone()).await,
+                    "create_character__submit_character" => submit_character(ctx.clone(), modal.clone()).await,
+                    "create_character__refuse_character" => refuse_character(ctx.clone(), modal.clone()).await,
+                    "create_character__accept_character" => accept_character(ctx.clone(), modal.clone()).await,
+                    "create_character__modify_character" => modify_character(ctx.clone(), modal.clone()).await,
+                    _ => return,
+                };
+
+                if let Err(e) = result {
+                    let locale = modal.locale.as_str();
+                    let content = tr_locale!(locale, &e.to_string());
+                    let _ = modal.create_response(ctx, CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .content(content)
+                            .ephemeral(true)
+                    )).await;
                 }
             }
         }

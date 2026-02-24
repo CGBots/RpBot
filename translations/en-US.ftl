@@ -22,6 +22,9 @@ stat_insert__failed = Failed to insert statistics
     .title = Failed to add stat
     .description = The stat could not be added.
 #Reply
+reply__reply_success = Success
+    .title = Success
+    .message = The operation was successful.
 reply__reply_failed = Failed to send reply
     .title = Reply failed
     .description = The reply failed
@@ -140,6 +143,14 @@ setup__continue_setup_message = Continue setup?
 setup__server_already_setup_timeout = Setup timeout exceeded
     .title = Timeout exceeded
     .message = The time to continue the setup has expired
+partial_setup__get_guild_roles_error = Failed to retrieve guild roles
+    .title = Setup error
+    .message = Unable to retrieve roles from the server.
+            Please try again or contact support if the problem persists: {$support}
+setup__server_not_found = Server not found
+    .title = Server not found
+    .message = This server is not registered in our database.
+            Please try again or contact support if the problem persists: {$support}
 setup_server__cancelled = Setup cancelled
     .title = Setup cancelled
     .message = Server setup has been cancelled
@@ -353,42 +364,69 @@ create_character__submit_notification = @here A character sheet is awaiting veri
 
 character_reject_reason = Reject reason
 
-create_character__no_universe_found = Univere not Found
+create_character__no_universe_found = Universe not found
     .title = Universe not found
-    .message = There are no existing universe for this server.
-create_character__database_error = DB error
-    .title = Check universes failed
-    .message = Unable to check universes.
+    .message = There is no existing universe for this server.
+create_character__database_error = Database error
+    .title = Database error
+    .message = Unable to access the database.
             Please try again or contact support if the problem persists: {$support}
+create_character__wrong_channel = Wrong channel
+    .title = Wrong channel
+    .message = This command must be used in the character sheet channel.
 create_character__character_already_existing = Character already exists
-    .title = Character already exist
+    .title = Character already exists
     .message = You already have a character. You can't create another one.
 CharacterModal = character_modal
     .character_name = Name
     .character_description = Character's description
-    .placeholder = test
+    .placeholder = Describe your character here...
     .character_story = Character's story
-    .value = test
+    .value = Once upon a time...
     .character_special_request = Special requests
-create_character__submited = Character sent
+create_character__submitted = Character sent
     .title = Character sent
-    .message = Character send to verification. Please wait until validation.
+    .message = Your character sheet has been sent for verification. Please wait for a moderator's decision.
 create_place__character_too_long = Character sheet too long
     .title = Character sheet too long
     .message = The character sheet is too long to be displayed. Please try again.
 character_instruction = Fill following fields to describe your character.
-    ► All pragraphs fields are limited to 1500 carracters. The whole character sheet mustn't exceed 4000 caracters.
-    ► A 30 minutes timeout is set by security. But you can always send before what you did and recover it.
-    It's done by cliking on modify button to change it before submiting to moderators.
+    ► All paragraph fields are limited to 1024 characters.
+    ► A 30 minutes timeout is set for security.
+    You can click on the modify button to change your draft before submitting it to moderators.
 create_character__timed_out = Timed out
     .title = Timed out
-    .message = The modal submit timed out.
+    .message = The character creation process timed out.
 create_character__guild_only = Guild only
     .title = Guild only
-    .message = This command is reserved to guilds.
+    .message = This command can only be used within a server.
 create_character__delete_successfull = Canceled
     .title = Character creation canceled
-    .message = Your character has successfully been cancelled.
+    .message = Your character creation process has been successfully canceled.
+delete_character = Character deleted
+    .title = Character deleted
+    .message = The character sheet has been successfully deleted.
 create_character__not_owner = Not owner
     .title = Not owner
-    .message = You're not the owner of this character. You can't ask to cancel it.
+    .message = You are not the owner of this character. You cannot perform this action.
+create_character__no_member = Member not found
+    .title = Error
+    .message = Unable to find member information.
+create_character__no_permission = Permission denied
+    .title = Permission denied
+    .message = You do not have the required permissions (Moderator or Administrator) to perform this action.
+create_character__invalid_footer = Invalid interaction
+    .title = Error
+    .message = The interaction metadata is invalid.
+create_character__refused = Character refused
+    .title = Character refused
+    .message = The character has been refused by a moderator.
+accept_character = Character accepted
+    .title = Character accepted
+    .message = The character has been successfully accepted and added to the universe.
+create_character__type_mismatch = Type mismatch
+    .title = Validation error
+    .message = One of the stat values provided does not match the expected type.
+create_character__message_not_found = Message not found
+    .title = Error
+    .message = Unable to find the original character sheet message.

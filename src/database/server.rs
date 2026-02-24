@@ -498,10 +498,11 @@ impl Server {
     }
 
     pub async fn has_character(self, user_id: u64) -> mongodb::error::Result<Option<Character>> {
-        let player_result = self.get_player_by_user_id(user_id).await?;
+        let player_result = self.get_player_by_user_id(user_id).await;
         match player_result {
-            None => { Ok(None) }
-            Some(character) => { Ok(Some(character)) }
+            Ok(None) => { Ok(None) }
+            Ok(Some(character)) => { Ok(Some(character)) }
+            Err(e) => { Err(e) }
         }
     }
 }

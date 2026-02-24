@@ -7,9 +7,9 @@ use crate::utility::reply::reply;
 
 #[poise::command(slash_command, required_permissions= "ADMINISTRATOR", guild_only)]
 pub async fn create_place(ctx: Context<'_>, name: String) -> Result<(), Error>{
-    ctx.defer().await?;
+    let Ok(_) = ctx.defer().await else { return Err("reply__reply_failed".into()) };
     let result = _create_place(&ctx, name).await;
-    reply(ctx, result).await?;
+    let Ok(_) = reply(ctx, result).await else { return Err("reply__reply_failed".into()) };
     Ok(())
 }
 

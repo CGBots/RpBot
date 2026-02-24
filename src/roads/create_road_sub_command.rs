@@ -16,9 +16,9 @@ pub async fn create_road(
     place_two: GuildChannel,
     distance: u64
 ) -> Result<(), Error> {
-    ctx.defer().await?;
+    let Ok(_) = ctx.defer().await else { return Err("reply__reply_failed".into()) };
     let result = _create_road(&ctx, place_one, place_two, distance).await;
-    reply(ctx.clone(), result).await?;
+    let Ok(_) = reply(ctx.clone(), result).await else { return Err("reply__reply_failed".into()) };
     Ok(())
 }
 

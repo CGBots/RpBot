@@ -63,7 +63,7 @@ use crate::tr;
 ///   `create_channel` to manage server resources.
 pub async fn partial_setup<'a>(ctx: &Context<'_>, server: &mut Server, snapshot: Server) -> Result<&'a str, Error> {
     //everyone role
-    let guild_id = ctx.guild_id().ok_or("guild_only")?;
+    let Ok(guild_id) = ctx.guild_id().ok_or("guild_only") else { return Err("guild_only".into()) };
     let everyone_role = guild_id.everyone_role();
     
     let Ok(existing_roles) = ctx.http().get_guild_roles(ctx.guild_id().unwrap()).await else {return Err("partial_setup__get_guild_roles_error".into())};
@@ -159,10 +159,10 @@ pub async fn partial_setup<'a>(ctx: &Context<'_>, server: &mut Server, snapshot:
         return Err("setup__error_during_role_creation".into())
     }
 
-    let admin_role = admin_role?;
-    let moderator_role = moderator_role?;
-    let spectator_role = spectator_role?;
-    let player_role = player_role?;
+    let Ok(admin_role) = admin_role else { return Err("setup__admin_role_not_created".into()) };
+    let Ok(moderator_role) = moderator_role else { return Err("setup__moderator_role_not_created".into()) };
+    let Ok(spectator_role) = spectator_role else { return Err("setup__spectator_role_not_created".into()) };
+    let Ok(player_role) = player_role else { return Err("setup__player_role_not_created".into()) };
     let everyone_role = everyone_role;
 
     let guild_id = ctx.guild_id().unwrap();

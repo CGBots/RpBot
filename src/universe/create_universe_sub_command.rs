@@ -46,9 +46,9 @@ pub async fn create_universe(
     universe_name: String,
     setup_type: SetupType
 ) -> Result<(), Error> {
-    ctx.defer().await?;
+    let Ok(_) = ctx.defer().await else { return Err("reply__reply_failed".into()) };
     let result = _create_universe(&ctx, universe_name, setup_type).await;
-    reply(ctx.clone(), result).await?;
+    let Ok(_) = reply(ctx.clone(), result).await else { return Err("reply__reply_failed".into()) };
     Ok(())
 }
 
@@ -148,12 +148,12 @@ pub async fn _create_universe(
         modifiers: vec![],
     };
 
-    if let Err(_) = speed_stat.insert_stat().await{
-        universe.delete().await?;
+    let Ok(_) = speed_stat.insert_stat().await else {
+        let _ = universe.delete().await;
         return Err("create_universe__speed_stat_insert_failed".into());
-    }
+    };
 
-    _setup(ctx, setup_type).await?;
+    let Ok(_) = _setup(ctx, setup_type).await else { return Err("setup_server__failed".into()) };
 
     Ok("create_universe__universe_successfully_created")
 }

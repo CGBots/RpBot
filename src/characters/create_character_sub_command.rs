@@ -1,12 +1,12 @@
-use futures::{StreamExt, TryStreamExt};
+use futures::{TryStreamExt};
 use std::time::Duration;
-use serenity::all::{ButtonStyle, Color, ComponentInteraction, CreateActionRow, CreateButton, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, CreateInputText, CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage, CreateModal, EditMessage, Embed, EmbedField, InputTextStyle, Mentionable, Message, ModalInteraction, Permissions, QuickModalResponse};
+use serenity::all::{ButtonStyle, Color, ComponentInteraction, CreateActionRow, CreateButton, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, CreateInputText, CreateInteractionResponse, CreateMessage, EditMessage, EmbedField, InputTextStyle, Permissions};
 use crate::discord::poise_structs::{Context, Error};
 use crate::utility::reply::reply;
 use serenity::client::Context as SerenityContext;
 use serenity::http::CacheHttp;
 use serenity::utils::CreateQuickModal;
-use crate::database::server::{get_server_by_id};
+use crate::database::server::{get_server_by_id, Server};
 use crate::{tr, tr_locale};
 use crate::database::characters::Character;
 use crate::database::stats::{Stat, StatValue};
@@ -27,15 +27,96 @@ pub static CHARACTER_SPECIAL_REQUEST: &str = "character_special_request";
 pub static CHARACTER_INSTRUCTION: &str = "character_instruction";
 pub static CHARACTER_REJECT_REASON: &str = "character_reject_reason";
 
+/// Verifies that the interaction user owns the character in the message
+/// Verifies that the interaction user is the owner of the character described in the message.
+///
+/// This is determined by comparing the interaction user's ID with the ID stored in the
+/// footer of the first embed of the message.
+///
+/// # Arguments
+/// * `_ctx` - The serenity context (unused, kept for signature consistency).
+/// * `component_interaction` - The interaction that triggered this check.
+///
+/// # Returns
+/// * `Ok(())` if the user is the owner.
+/// * `Err` if the footer is invalid or the user is not the owner.
+async fn verify_character_ownership(
+    _ctx: &SerenityContext,
+    component_interaction: &ComponentInteraction,
+) -> Result<(), Error> {
+    let user_id = component_interaction.user.id.get();
+    // The character owner's ID is stored as a string in the embed footer
+    let Ok(character_user_id) = component_interaction.message.embeds[0]
+        .footer.as_ref()
+        .and_then(|footer| footer.text.parse::<u64>().ok())
+        .ok_or_else(|| -> Error { "create_character__invalid_footer".into() }) else { return Err("create_character__invalid_footer".into()) };
+
+    if user_id != character_user_id {
+        return Err("create_character__not_owner".into());
+    }
+
+    Ok(())
+}
+
+/// Verifies that the user has moderator or administrator permissions in the current guild.
+///
+/// A user is considered to have permission if they:
+/// 1. Have the `ADMINISTRATOR` permission.
+/// 2. Have a role that matches the `moderator_role_id` in the server configuration.
+/// 3. Have a role that matches the `admin_role_id` in the server configuration.
+///
+/// # Arguments
+/// * `_ctx` - The serenity context (unused, kept for signature consistency).
+/// * `component_interaction` - The interaction that triggered this check.
+/// * `server` - The server configuration from the database.
+///
+/// # Returns
+/// * `Ok(())` if the user has permission.
+/// * `Err` if the user is not a member or lacks permissions.
+async fn verify_moderator_permission(
+    _ctx: &SerenityContext,
+    component_interaction: &ComponentInteraction,
+    server: &Server,
+) -> Result<(), Error> {
+    let Ok(member) = component_interaction.member.as_ref()
+        .ok_or("create_character__no_member") else { return Err("create_character__no_member".into()) };
+
+    let has_admin_permission = member.permissions
+        .map_or(false, |p| p.contains(Permissions::ADMINISTRATOR));
+    let has_moderator_role = server.moderator_role_id
+        .map_or(false, |role| member.roles.contains(&role.id.into()));
+    let has_admin_role = server.admin_role_id
+        .map_or(false, |role| member.roles.contains(&role.id.into()));
+
+    if !has_admin_permission && !has_moderator_role && !has_admin_role {
+        return Err("create_character__no_permission".into());
+    }
+
+    Ok(())
+}
+
+/// Slash command to initiate the character creation process.
+///
+/// It delegates to `_create_character` and sends the result back to the user using the `reply` utility.
 #[poise::command(slash_command, guild_only)]
 pub async fn create_character(
     ctx: Context<'_>
 ) -> Result<(), Error> {
     let result = _create_character(ctx).await;
-    if result.is_err(){ reply(ctx, result).await?;}
+    let Ok(_) = reply(ctx, result).await else { return Err("reply__reply_failed".into()) };
     Ok(())
 }
 
+/// Internal logic for creating a character.
+///
+/// This function:
+/// 1. Validates that the command is used in the correct channel and the user doesn't already have a character.
+/// 2. Opens a modal for the user to fill in character details.
+/// 3. Sends a message with an embed containing the character info and buttons for further actions (Submit, Modify, Delete).
+///
+/// # Returns
+/// * `Ok(&'static str)` - The translation key for the success message.
+/// * `Err` - If any validation fails, the process times out, or a database error occurs.
 pub async fn _create_character(ctx: Context<'_>) -> Result<&'static str, Error>{
     // 2 process qui échangent
     //  validation par les modos/admins
@@ -60,21 +141,10 @@ pub async fn _create_character(ctx: Context<'_>) -> Result<&'static str, Error>{
     if server.rp_character_channel_id.unwrap().id != ctx.channel_id().get(){
         return Err("create_character__wrong_channel".into())
     }
-
-    let player_result = server.has_character(ctx.author().id.get()).await?;
-    match player_result {
-        None => {}
-        Some(_) => {
-            ctx.send(poise::CreateReply::default()
-                .embed(CreateEmbed::new()
-                    .color(Color::from_rgb(255, 0, 0))
-                    .title(crate::translation::get(ctx, "create_character__character_already_existing", Some("title"), None))
-                    .description(crate::translation::get(ctx, "create_character__character_already_existing", Some("message"), None))
-                )
-                .ephemeral(true)
-            ).await?;
-            return Ok("create_character__character_already_existing")
-        }
+ 
+    let Ok(player_result) = server.has_character(ctx.author().id.get()).await else { return Err("create_character__database_error".into()) };
+    if player_result.is_some() {
+        return Err("create_character__character_already_existing".into());
     }
 
     let app_ctx = match ctx.clone() {
@@ -101,10 +171,10 @@ pub async fn _create_character(ctx: Context<'_>) -> Result<&'static str, Error>{
         )
         .timeout(Duration::from_secs(30));
 
-    let interaction = app_ctx.interaction.quick_modal(ctx.serenity_context(), modal).await?;
+    let Ok(interaction) = app_ctx.interaction.quick_modal(ctx.serenity_context(), modal).await else { return Err("create_character__timed_out".into()) };
     let modal_response = match interaction {
         Some(interaction) => {
-            interaction.interaction.create_response(ctx, CreateInteractionResponse::Acknowledge).await?;
+            let Ok(_) = interaction.interaction.create_response(ctx, CreateInteractionResponse::Acknowledge).await else { return Err("create_character__database_error".into()) };
             interaction }
         None => {
             return Err("create_character__timed_out".into()) }
@@ -137,41 +207,30 @@ pub async fn _create_character(ctx: Context<'_>) -> Result<&'static str, Error>{
 
     match result_message {
         Ok(_) => {
-            Ok("create_character__submited")
+            Ok("create_character__submitted")
         }
         Err(_) => { Err("create_place__character_too_long".into()) }
     }
 }
 
+/// Deletes a character sheet draft from the channel.
+///
+/// Only the owner of the character can perform this action.
 pub async fn delete_character(ctx: SerenityContext, component_interaction: ComponentInteraction) -> Result<&'static str, Error>{
-    let interaction = component_interaction.clone();
-    let user_id_string = interaction.user.id.get().to_string();
-    let user = user_id_string.as_str();
-    let character = interaction.message.embeds[0].clone().footer.unwrap();
-    let character_user = character.text.as_str();
-
-    if user != character_user{
-        let _ = component_interaction.create_response(ctx, CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new().content(tr_locale!(component_interaction.locale.as_str(), "create_character__not_owner")).ephemeral(true)
-        )).await?;
-        return Err("create_character__not_owner".into())
-    }
-
-    component_interaction.message.delete(ctx).await?;
+    let Ok(_) = verify_character_ownership(&ctx, &component_interaction).await else { return Err("create_character__not_owner".into()) };
+    let Ok(_) = component_interaction.message.delete(ctx).await else { return Err("create_character__database_error".into()) };
     Ok("delete_character")
 }
-pub async fn submit_character(ctx: SerenityContext, component_interaction: ComponentInteraction) -> Result<&'static str, Error> {
-    let interaction = component_interaction.clone();
-    let user_id_string = interaction.user.id.get().to_string();
-    let user = user_id_string.as_str();
-    let character = interaction.message.embeds[0].clone().footer.unwrap();
-    let character_user = character.text.as_str();
 
-    if user != character_user{
-        let _ = component_interaction.create_response(ctx.clone(), CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new().content(tr_locale!(component_interaction.locale.as_str(), "create_character__not_owner")).ephemeral(true)
-        )).await?;
-    }
+/// Submits a character sheet draft for moderator approval.
+///
+/// This function:
+/// 1. Verifies ownership.
+/// 2. Replaces the action buttons with "Accept" and "Refuse" (visible to moderators).
+/// 3. Changes the embed color to green to indicate submission.
+/// 4. Sends a notification message to the server's log channel if configured.
+pub async fn submit_character(ctx: SerenityContext, component_interaction: ComponentInteraction) -> Result<&'static str, Error> {
+    let Ok(_) = verify_character_ownership(&ctx, &component_interaction).await else { return Err("create_character__not_owner".into()) };
 
     let buttons = vec![
         CreateActionRow::Buttons(
@@ -185,18 +244,17 @@ pub async fn submit_character(ctx: SerenityContext, component_interaction: Compo
     let message = component_interaction.message.clone();
     let embed: CreateEmbed = message.embeds[0].clone().into();
 
-    let result_message =
-        component_interaction.channel_id.edit_message(ctx.clone(), message.id, EditMessage::new().embed(
-            embed.color(Color::from_rgb(0, 255, 0))
-        )
-            .components(buttons)
-        ).await;
+    let Ok(_) = component_interaction.channel_id.edit_message(ctx.clone(), message.id, EditMessage::new().embed(
+        embed.color(Color::from_rgb(0, 255, 0))
+    )
+        .components(buttons)
+    ).await else { return Err("create_character__database_error".into()) };
 
-    let _ = component_interaction.create_response(ctx.clone(), CreateInteractionResponse::Acknowledge).await;
+    let Ok(_) = component_interaction.create_response(ctx.clone(), CreateInteractionResponse::Acknowledge).await else { return Err("create_character__database_error".into()) };
 
     let message = tr_locale!(component_interaction.locale.as_str(), CREATE_CHARACTER_SUBMIT_NOTIFICATION) + " " + component_interaction.message.link().as_str();
 
-    if let Some(server) = get_server_by_id(component_interaction.guild_id.unwrap().get()).await? {
+    if let Ok(Some(server)) = get_server_by_id(component_interaction.guild_id.unwrap().get()).await {
         if let Some(log_channel) = server.log_channel_id {
             let _ = ctx.http().send_message(
                 log_channel.id.into(),
@@ -206,31 +264,19 @@ pub async fn submit_character(ctx: SerenityContext, component_interaction: Compo
         }
     }
 
-
-    match result_message {
-        Ok(_) => {
-            Ok("create_character__submited")
-        }
-        Err(_) => { Err("create_place__character_too_long".into()) }
-    }
+    Ok("create_character__submitted")
 }
 
+/// Opens a modal to allow the user to modify their character sheet draft.
+///
+/// Only the owner can modify their character. The modal is pre-populated with
+/// the current values extracted from the message embed.
 pub async fn modify_character(ctx: SerenityContext, component_interaction: ComponentInteraction) -> Result<&'static str, Error> {
-     let interaction = component_interaction.clone();
-     let user_id_string = interaction.user.id.get().to_string();
-     let user = user_id_string.as_str();
-     let character = interaction.message.embeds[0].clone().footer.unwrap();
-     let character_user = character.text.as_str();
-
-     if user != character_user{
-         let _ = component_interaction.create_response(ctx.clone(), CreateInteractionResponse::Message(
-             CreateInteractionResponseMessage::new().content(tr_locale!(component_interaction.locale.as_str(), "create_character__not_owner")).ephemeral(true)
-         )).await?;
-         return Err("create_character__not_owner".into())
-     }
+    let Ok(_) = verify_character_ownership(&ctx, &component_interaction).await else { return Err("create_character__not_owner".into()) };
 
     let embed_fields = component_interaction.message.embeds[0].clone().fields;
 
+    // Create modal with existing values from the embed
     let modal = CreateQuickModal::new(tr_locale!(component_interaction.locale.as_str(), CHARACTER_MODAL_TITLE))
         .field(
             CreateInputText::new(InputTextStyle::Short, tr_locale!(component_interaction.locale.as_str(), CHARACTER_NAME), CHARACTER_NAME)
@@ -254,13 +300,15 @@ pub async fn modify_character(ctx: SerenityContext, component_interaction: Compo
         )
         .timeout(Duration::from_secs(30));
 
-    let interaction = component_interaction.quick_modal(&ctx, modal).await?;
+    let Ok(interaction) = component_interaction.quick_modal(&ctx, modal).await else { return Err("create_character__timed_out".into()) };
     let modal_response = match interaction {
         Some(interaction) => {
-            interaction.interaction.create_response(ctx.clone(), CreateInteractionResponse::Acknowledge).await?;
-            interaction }
+            let Ok(_) = interaction.interaction.create_response(ctx.clone(), CreateInteractionResponse::Acknowledge).await else { return Err("create_character__database_error".into()) };
+            interaction
+        }
         None => {
-            return Err("create_character__timed_out".into()) }
+            return Err("create_character__timed_out".into())
+        }
     };
 
     let inputs = modal_response.inputs.clone();
@@ -290,7 +338,8 @@ pub async fn modify_character(ctx: SerenityContext, component_interaction: Compo
                     .color(Color::from_rgb(112, 190, 255))
             )
                 .components(buttons)
-            ).await}
+            ).await
+        }
         Some(message) => {
             let embed_fields = vec![
                 (
@@ -309,12 +358,12 @@ pub async fn modify_character(ctx: SerenityContext, component_interaction: Compo
                     false
                 )
             ];
-            modal_response.interaction.channel_id.edit_message(ctx, message.id , EditMessage::new().embed(
+            modal_response.interaction.channel_id.edit_message(ctx, message.id, EditMessage::new().embed(
                 CreateEmbed::new()
                     .footer(CreateEmbedFooter::new(message.embeds.get(0).unwrap().footer.clone().unwrap().text.as_str()))
                     .title(inputs[0].clone())
                     .fields(embed_fields)
-                    .author(CreateEmbedAuthor::new( component_interaction.user.name.as_str()))
+                    .author(CreateEmbedAuthor::new(component_interaction.user.name.as_str()))
                     .color(Color::from_rgb(112, 190, 255))
             )
                 .components(buttons)
@@ -323,37 +372,23 @@ pub async fn modify_character(ctx: SerenityContext, component_interaction: Compo
     };
 
     match result_message {
-        Ok(_) => {
-            Ok("create_character__submited")
-        }
-        Err(_) => { Err("create_place__character_too_long".into()) }
+        Ok(_) => Ok("create_character__submitted"),
+        Err(_) => Err("create_place__character_too_long".into())
     }
- }
+}
+
+/// Allows a moderator to refuse a character sheet.
+///
+/// This function:
+/// 1. Verifies moderator permissions.
+/// 2. Opens a modal to ask for a rejection reason.
+/// 3. Appends the reason to the embed, changes its color to red, and removes all buttons.
 pub async fn refuse_character(ctx: SerenityContext, component_interaction: ComponentInteraction) -> Result<&'static str, Error> {
-    let member = component_interaction.member.as_ref().unwrap();
-
     let guild_id = component_interaction.guild_id.unwrap();
-    let server = get_server_by_id(guild_id.get()).await;
-    let server = match server {
-        Ok(result) => {
-            match result {
-                None => { return Err("create_character__no_universe_found".into()) }
-                Some(server) => { server }
-            }
-        }
-        Err(_) => { return Err("create_character__database_error".into()) }
-    };
+    let Ok(server) = get_server_by_id(guild_id.get()).await else { return Err("create_character__database_error".into()) };
+    let Ok(server) = server.ok_or("create_character__no_universe_found") else { return Err("create_character__no_universe_found".into()) };
 
-    let has_admin_permission = member.permissions.map_or(false, |p| p.contains(Permissions::ADMINISTRATOR));
-    let has_moderator_role = server.moderator_role_id.map_or(false, |role| member.roles.contains(&role.id.into()));
-    let has_admin_role = server.admin_role_id.map_or(false, |role| member.roles.contains(&role.id.into()));
-
-    if !has_admin_permission && !has_moderator_role && !has_admin_role {
-        let _ = component_interaction.create_response(ctx.clone(), CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new().content(tr_locale!(component_interaction.locale.as_str(), "create_character__no_permission")).ephemeral(true)
-        )).await?;
-        return Err("create_character__no_permission".into());
-    }
+    let Ok(_) = verify_moderator_permission(&ctx, &component_interaction, &server).await else { return Err("create_character__no_permission".into()) };
 
     let modal = CreateQuickModal::new(tr_locale!(component_interaction.locale.as_str(), CHARACTER_MODAL_TITLE))
         .field(
@@ -362,62 +397,88 @@ pub async fn refuse_character(ctx: SerenityContext, component_interaction: Compo
         )
         .timeout(Duration::from_secs(30));
 
-    let interaction = component_interaction.quick_modal(&ctx, modal).await?;
+    let Ok(interaction) = component_interaction.quick_modal(&ctx, modal).await else { return Err("create_character__timed_out".into()) };
     let modal_response = match interaction {
         Some(interaction) => {
-            interaction.interaction.create_response(ctx.clone(), CreateInteractionResponse::Acknowledge).await?;
-            interaction }
+            let Ok(_) = interaction.interaction.create_response(ctx.clone(), CreateInteractionResponse::Acknowledge).await else { return Err("create_character__database_error".into()) };
+            interaction
+        }
         None => {
-            return Err("create_character__timed_out".into()) }
+            return Err("create_character__timed_out".into())
+        }
     };
 
     let inputs = modal_response.inputs.clone();
 
-    let buttons = vec![
-        CreateActionRow::Buttons(
-            vec![
-                CreateButton::new(SUBMIT_CHARACTER_BUTTON_CUSTOM_ID).label(tr_locale!(modal_response.interaction.locale.as_str(), SUBMIT_CHARACTER_BUTTON_CUSTOM_ID)).style(ButtonStyle::Success),
-                CreateButton::new(MODIFY_CHARACTER_BUTTON_CUSTOM_ID).label(tr_locale!(modal_response.interaction.locale.as_str(), MODIFY_CHARACTER_BUTTON_CUSTOM_ID)).style(ButtonStyle::Primary),
-                CreateButton::new(DELETE_CHARACTER_BUTTON_CUSTOM_ID).label(tr_locale!(modal_response.interaction.locale.as_str(), DELETE_CHARACTER_BUTTON_CUSTOM_ID)).style(ButtonStyle::Danger),
-            ]
-        )
-    ];
+    let Ok(message) = modal_response.interaction.message
+        .ok_or("create_character__message_not_found") else { return Err("create_character__message_not_found".into()) };
 
-    let interaction = modal_response.interaction.clone();
+    let mut embed_fields = component_interaction.message.embeds[0].clone().fields;
+    embed_fields.push(EmbedField::new(
+        tr_locale!(component_interaction.locale.as_str(), CHARACTER_REJECT_REASON),
+        inputs[0].clone(),
+        false
+    ));
 
-    let result_message = if let Some(message) = modal_response.interaction.message {
-        let mut embed_fields = component_interaction.message.embeds[0].clone().fields;
-        embed_fields.push(EmbedField::new(tr_locale!(component_interaction.locale.as_str(), CHARACTER_REJECT_REASON), inputs[0].clone(), false));
+    let embed_fields: Vec<(String, String, bool)> = embed_fields
+        .iter()
+        .map(|field| (field.name.clone(), field.value.clone(), field.inline))
+        .collect();
 
-        let embed_fields: Vec<(String, String, bool)> = embed_fields
-            .iter()
-            .map(|field| (field.name.clone(), field.value.clone(), field.inline))
-            .collect();
+    let Ok(_) = modal_response.interaction.channel_id.edit_message(ctx, message.id, EditMessage::new().embed(
+        CreateEmbed::new()
+            .footer(CreateEmbedFooter::new(message.embeds.get(0).unwrap().footer.clone().unwrap().text.as_str()))
+            .title(inputs[0].clone())
+            .fields(embed_fields)
+            .author(CreateEmbedAuthor::new(component_interaction.user.name.as_str()))
+            .color(Color::from_rgb(255, 0, 0))
+    )
+        .components(vec![])
+    ).await else { return Err("create_character__database_error".into()) };
 
-        let mess = modal_response.interaction.channel_id.edit_message(ctx, message.id, EditMessage::new().embed(
-            CreateEmbed::new()
-                .footer(CreateEmbedFooter::new(message.embeds.get(0).unwrap().footer.clone().unwrap().text.as_str()))
-                .title(inputs[0].clone())
-                .fields(embed_fields)
-                .author(CreateEmbedAuthor::new(component_interaction.user.name.as_str()))
-                .color(Color::from_rgb(255, 0, 0))
-        )
-            .components(buttons)
-        ).await;
-        mess
-    }
-        else{return Err("create_character__message_not_found".into())};
+    Ok("create_character__refused")
+}
 
-    match result_message {
-        Ok(_) => {
-            Ok("create_character__submited")
-        }
-        Err(_) => { Err("create_place__character_too_long".into()) }
+/// Parses a stat value from a string based on the expected `StatValue` variant.
+///
+/// Supported types: `i64`, `f64`, `String`, `bool`.
+fn parse_stat_value(value_str: &str, base_value: &StatValue) -> Option<StatValue> {
+    match base_value {
+        StatValue::I64(_) => value_str.parse::<i64>().ok().map(StatValue::I64),
+        StatValue::F64(_) => value_str.parse::<f64>().ok().map(StatValue::F64),
+        StatValue::String(_) => Some(StatValue::String(value_str.to_string())),
+        StatValue::Bool(_) => value_str.parse::<bool>().ok().map(StatValue::Bool),
     }
 }
+
+/// Creates a new `Stat` instance with a new value while preserving other attributes.
+fn create_stat_with_value(stat: &Stat, value: StatValue) -> Stat {
+    Stat {
+        _id: Default::default(),
+        universe_id: Default::default(),
+        name: stat.name.clone(),
+        base_value: value,
+        formula: stat.formula.clone(),
+        min: stat.min.clone(),
+        max: stat.max.clone(),
+        modifiers: vec![],
+    }
+}
+
+
+
+/// Allows a moderator to accept a character sheet and finalize its stats.
+///
+/// This is a complex multi-step process:
+/// 1. Verifies moderator permissions.
+/// 2. Fetches the defined stats for the universe.
+/// 3. Opens a modal with a text area containing a template of all stats.
+/// 4. Parses the moderator's input to extract stat values.
+/// 5. Saves the character and its stats to the database.
+/// 6. Assigns the `player_role_id` to the user if configured.
+/// 7. Updates the message to indicate acceptance and removes all buttons.
 pub async fn accept_character(ctx: SerenityContext, component_interaction: ComponentInteraction) -> Result<&'static str, Error> {
     let member = component_interaction.member.as_ref().unwrap();
-
     let guild_id = component_interaction.guild_id.unwrap();
     let server = get_server_by_id(guild_id.get()).await;
     let server = match server {
@@ -430,144 +491,76 @@ pub async fn accept_character(ctx: SerenityContext, component_interaction: Compo
         Err(_) => { return Err("create_character__database_error".into()) }
     };
 
+    // Permission check
     let has_admin_permission = member.permissions.map_or(false, |p| p.contains(Permissions::ADMINISTRATOR));
     let has_moderator_role = server.moderator_role_id.map_or(false, |role| member.roles.contains(&role.id.into()));
     let has_admin_role = server.admin_role_id.map_or(false, |role| member.roles.contains(&role.id.into()));
-
     if !has_admin_permission && !has_moderator_role && !has_admin_role {
-        let _ = component_interaction.create_response(ctx.clone(), CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new().content(tr_locale!(component_interaction.locale.as_str(), "create_character__no_permission")).ephemeral(true)
-        )).await?;
         return Err("create_character__no_permission".into());
     }
 
-    let universe = get_universe_by_id(server.universe_id.to_string()).await?;
-    let stats_cursor = universe.unwrap().get_stats().await?;
-    let stats: Vec<Stat> = stats_cursor.try_collect().await.unwrap();
+    let Ok(universe) = get_universe_by_id(server.universe_id.to_string()).await else { return Err("create_character__database_error".into()) };
+    let Ok(universe) = universe.ok_or("create_character__no_universe_found") else { return Err("create_character__no_universe_found".into()) };
+    let Ok(stats_cursor) = universe.get_stats().await else { return Err("create_character__database_error".into()) };
+    let Ok(stats) = stats_cursor.try_collect::<Vec<Stat>>().await else { return Err("create_character__database_error".into()) };
 
+    // Prepare the stat template for the modal
     let mut quick_modal = CreateQuickModal::new(tr_locale!(component_interaction.locale.as_str(), CHARACTER_MODAL_TITLE));
-
-    let mut text = "".to_string();
+    let mut text = String::new();
     for stat in stats.clone() {
-        text += (stat.name.to_string() + ": [".into() + format!("{:?}", stat.base_value).as_str() + "]\n".into()).as_str();
+        text.push_str(&format!("{}: [{:?}]\n", stat.name, stat.base_value));
     };
     quick_modal = quick_modal.field(CreateInputText::new(InputTextStyle::Paragraph, "test", "test").value(text).required(true));
-
-    let interaction = component_interaction.quick_modal(&ctx, quick_modal).await?;
+    let Ok(interaction) = component_interaction.quick_modal(&ctx, quick_modal).await else { return Err("create_character__timed_out".into()) };
 
     let mut extracted_stats: Vec<Stat> = Vec::new();
-
     match interaction {
         Some(interaction) => {
-            for stat in stats.iter() {
-                let input = interaction.inputs[0].clone();
+            let input = interaction.inputs[0].clone();
+            let mut line_matched = std::collections::HashSet::new();
 
-                let mut line_matched = std::collections::HashSet::new();
-                for line in input.lines() {
-                    for stat in stats.iter() {
-                        if line.contains(&stat.name) {
-                            line_matched.insert(stat.name.clone());
-                            if let Some(colon_pos) = line.find(':') {
-                                let value_str = line[colon_pos + 1..].trim();
-                                let parsed_value = match &stat.base_value {
-                                    StatValue::I64(_) => {
-                                        value_str.parse::<i64>().ok().map(StatValue::I64)
-                                    }
-                                    StatValue::F64(_) => {
-                                        value_str.parse::<f64>().ok().map(StatValue::F64)
-                                    }
-                                    StatValue::String(_) => {
-                                        Some(StatValue::String(value_str.to_string()))
-                                    }
-                                    StatValue::Bool(_) => {
-                                        value_str.parse::<bool>().ok().map(StatValue::Bool)
-                                    }
-                                };
-                                if let Some(value) = parsed_value {
-                                    let stat_with_value = Stat {
-                                        _id: Default::default(),
-                                        universe_id: Default::default(),
-                                        name: stat.name.clone(),
-                                        base_value: value,
-                                        formula: stat.formula.clone(),
-                                        min: stat.min.clone(),
-                                        max: stat.max.clone(),
-                                        modifiers: vec![],
-                                    };
-                                    extracted_stats.push(stat_with_value);
-                                } else {
-                                    interaction.interaction.create_response(ctx.clone(), CreateInteractionResponse::Message(
-                                        CreateInteractionResponseMessage::new()
-                                            .embed(CreateEmbed::new()
-                                                .color(Color::from_rgb(255, 0, 0))
-                                                .title(tr_locale!(component_interaction.locale.as_str(), "create_character__validation_error"))
-                                                .description(format!("{}: {}", stat.name, tr_locale!(component_interaction.locale.as_str(), "create_character__type_mismatch")))
-                                            ).ephemeral(true)
-                                    )).await?;
-                                    return Err("create_character__type_mismatch".into());
-                                }
-                            } else {
-                                let parsed_value = match &stat.base_value {
-                                    StatValue::I64(_) => {
-                                        line.trim().parse::<i64>().ok().map(StatValue::I64)
-                                    }
-                                    StatValue::F64(_) => {
-                                        line.trim().parse::<f64>().ok().map(StatValue::F64)
-                                    }
-                                    StatValue::String(_) => {
-                                        Some(StatValue::String(line.trim().to_string()))
-                                    }
-                                    StatValue::Bool(_) => {
-                                        line.trim().parse::<bool>().ok().map(StatValue::Bool)
-                                    }
-                                };
-                                if let Some(value) = parsed_value {
-                                    let stat_with_value = Stat {
-                                        _id: Default::default(),
-                                        universe_id: Default::default(),
-                                        name: stat.name.clone(),
-                                        base_value: value,
-                                        formula: stat.formula.clone(),
-                                        min: stat.min.clone(),
-                                        max: stat.max.clone(),
-                                        modifiers: vec![],
-                                    };
-                                    extracted_stats.push(stat_with_value);
-                                } else {
-                                    interaction.interaction.create_response(ctx.clone(), CreateInteractionResponse::Message(
-                                        CreateInteractionResponseMessage::new()
-                                            .embed(CreateEmbed::new()
-                                                .color(Color::from_rgb(255, 0, 0))
-                                                .title(tr_locale!(component_interaction.locale.as_str(), "create_character__validation_error"))
-                                                .description(format!("{}: {}", stat.name, tr_locale!(component_interaction.locale.as_str(), "create_character__type_mismatch")))
-                                            ).ephemeral(true)
-                                    )).await?;
-                                    return Err("create_character__type_mismatch".into());
-                                }
-                            }
-                            break;
-                        }
-                    }
-                }
+            // Parse each line of the input to find stat values
+            for line in input.lines() {
                 for stat in stats.iter() {
-                    if !line_matched.contains(&stat.name) {
-                        extracted_stats.push(stat.clone());
+                    if line.contains(&stat.name) {
+                        line_matched.insert(stat.name.clone());
+
+                        // Value is expected after a colon, or the whole line if no colon
+                        let value_str = if let Some(colon_pos) = line.find(':') {
+                            &line[colon_pos + 1..].trim()
+                        } else {
+                            line.trim()
+                        };
+
+                        if let Some(value) = parse_stat_value(value_str, &stat.base_value) {
+                            extracted_stats.push(create_stat_with_value(stat, value));
+                        } else {
+                            return Err("create_character__type_mismatch".into());
+                        }
+                        break;
                     }
                 }
             }
-            interaction.interaction.create_response(ctx.clone(), CreateInteractionResponse::Acknowledge).await?;
+
+            // For any stats not found in the input, use their default values
+            for stat in stats.iter() {
+                if !line_matched.contains(&stat.name) {
+                    extracted_stats.push(stat.clone());
+                }
+            }
+
+            let Ok(_) = interaction.interaction.create_response(ctx.clone(), CreateInteractionResponse::Acknowledge).await else { return Err("create_character__database_error".into()) };
         }
         None => {
             return Err("create_character__timed_out".into());
         }
     }
 
-
-    let character_user_id = component_interaction.message.embeds[0]
+    // Extract user ID from embed footer
+    let Ok(character_user_id) = component_interaction.message.embeds[0]
         .footer.as_ref()
         .unwrap()
-        .text.parse::<u64>()
-        .unwrap();
+        .text.parse::<u64>() else { return Err("create_character__invalid_footer".into()) };
 
     let character_name = component_interaction.message.embeds[0]
         .title.as_ref()
@@ -575,17 +568,17 @@ pub async fn accept_character(ctx: SerenityContext, component_interaction: Compo
         .clone();
 
     let embed_fields = &component_interaction.message.embeds[0].fields;
-    let description = embed_fields.iter()
+    let _description = embed_fields.iter()
         .find(|f| f.name == tr_locale!(component_interaction.locale.as_str(), CHARACTER_DESCRIPTION))
         .map(|f| f.value.clone())
         .unwrap_or_default();
 
-    let story = embed_fields.iter()
+    let _story = embed_fields.iter()
         .find(|f| f.name == tr_locale!(component_interaction.locale.as_str(), CHARACTER_STORY))
         .map(|f| f.value.clone())
         .unwrap_or_default();
 
-    let special_request = embed_fields.iter()
+    let _special_request = embed_fields.iter()
         .find(|f| f.name == tr_locale!(component_interaction.locale.as_str(), CHARACTER_SPECIAL_REQUEST))
         .map(|f| f.value.clone())
         .unwrap_or_default();
@@ -593,17 +586,17 @@ pub async fn accept_character(ctx: SerenityContext, component_interaction: Compo
 
 
     let character = Character {
-        _id: Default::default(), // Assuming `_id` is an `Option<T>` or an equivalent type
+        _id: Default::default(), 
         user_id: character_user_id,
         universe_id: server.universe_id,
         name: character_name,
-        stats: extracted_stats, // Assuming `extracted_stats` matches the `stats` field's type
+        stats: extracted_stats,
     };
 
-    character.update().await?;
+    let Ok(_) = character.update().await else { return Err("create_character__database_error".into()) };
 
     if let Some(player_role_id) = server.player_role_id {
-        if let Ok(mut member) = ctx.http().get_member(guild_id, character_user_id.into()).await {
+        if let Ok(member) = ctx.http().get_member(guild_id, character_user_id.into()).await {
             let _ = member.add_role(&ctx.http(), player_role_id.id).await;
         }
     }

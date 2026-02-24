@@ -12,9 +12,9 @@ use crate::utility::reply::reply;
 
 #[poise::command(slash_command, required_permissions = "ADMINISTRATOR", guild_only)]
 pub async fn add_server(ctx: Context<'_>, setup_type: SetupType) -> Result<(), Error> {
-    ctx.defer().await?;
+    let Ok(_) = ctx.defer().await else { return Err("reply__reply_failed".into()) };
     let result = _add_server(&ctx, setup_type).await;
-    reply(ctx, result).await?;
+    let Ok(_) = reply(ctx, result).await else { return Err("reply__reply_failed".into()) };
     Ok(())
 }
 
@@ -42,14 +42,14 @@ pub async fn _add_server(ctx: &Context<'_>, setup_type: SetupType) -> Result<&'s
         CreateSelectMenuKind::String { options },
     ));
 
-    let message = ctx
+    let Ok(message) = ctx
         .send(
             CreateReply::default()
                 .content(tr!(*ctx, "choose_universe"))
                 .components(vec![action_row])
                 .ephemeral(true),
         )
-        .await?;
+        .await else { return Err("reply__reply_failed".into()) };
 
     let serenity_context = ctx.serenity_context();
 
@@ -62,15 +62,16 @@ pub async fn _add_server(ctx: &Context<'_>, setup_type: SetupType) -> Result<&'s
             if let Some(selected) = values.get(0) {
                 let _ = message.delete(*ctx).await;
 
-                let Some(universe) = get_universe_by_id(selected.to_string()).await? else {return Err("placeholder".into())};
+                let Ok(universe_opt) = get_universe_by_id(selected.to_string()).await else { return Err("create_character__database_error".into()) };
+                let Some(universe) = universe_opt else {return Err("create_character__no_universe_found".into())};
 
-                let res = universe.clone().check_server_limit().await?;
+                let Ok(res) = universe.clone().check_server_limit().await else { return Err("universe__check_server_limit_failed".into()) };
 
                 if !res{
                     return Err("exceed_limit_number_of_servers_per_universe".into())
                 }
 
-                let server = Server{
+                let Ok(_) = Server{
                     _id: Default::default(),
                     universe_id: universe.universe_id,
                     server_id: ctx.guild_id().unwrap().get(),
@@ -89,8 +90,8 @@ pub async fn _add_server(ctx: &Context<'_>, setup_type: SetupType) -> Result<&'s
                     commands_channel_id: Default::default(),
                     nrp_general_channel_id: Default::default(),
                     rp_character_channel_id: Default::default(),
-                }.insert_server().await?;
-                _setup(&ctx, setup_type).await?;
+                }.insert_server().await else { return Err("create_universe__server_insert_failed".into()) };
+                let Ok(_) = _setup(&ctx, setup_type).await else { return Err("setup_server__failed".into()) };
 
                 return Ok("add_server_to_universe__guild_linked");
             }

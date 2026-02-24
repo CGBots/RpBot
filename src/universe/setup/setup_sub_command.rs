@@ -52,9 +52,9 @@ pub enum SetupType {
 /// This command is intended to be run by guild administrators to perform initial setup steps or configurations required for the bot's operation.
 #[poise::command(slash_command, required_permissions = "ADMINISTRATOR", guild_only)]
 pub async fn setup(ctx: Context<'_>, setup_type: SetupType) -> Result<(), Error> {
-    ctx.defer().await?;
+    let Ok(_) = ctx.defer().await else { return Err("reply__reply_failed".into()) };
     let result = _setup(&ctx, setup_type).await;
-    reply(ctx, result).await?;
+    let Ok(_) = reply(ctx, result).await else { return Err("reply__reply_failed".into()) };
     Ok(())
 }
 
@@ -107,7 +107,8 @@ pub async fn setup(ctx: Context<'_>, setup_type: SetupType) -> Result<(), Error>
 pub async fn _setup(ctx: &Context<'_>, setup_type: SetupType) -> Result<&'static str, Error> {
     let guild_id = ctx.guild_id().unwrap();
 
-    let Some(mut server) = get_server_by_id(guild_id.get()).await? else { return Err("setup__server_not_found".into()) };
+    let Ok(server_opt) = get_server_by_id(guild_id.get()).await else { return Err("setup__server_not_found".into()) };
+    let Some(mut server) = server_opt else { return Err("setup__server_not_found".into()) };
     let server_snapshot = server.clone().snaphot(ctx).await;
 
     if server.admin_role_id.is_some()
@@ -152,15 +153,15 @@ pub async fn _setup(ctx: &Context<'_>, setup_type: SetupType) -> Result<&'static
             .await;
         match interaction {
             None => {
-                message.delete(*ctx).await?;
+                let Ok(_) = message.delete(*ctx).await else { return Err("setup_server__failed".into()) };
                 return Err("setup__server_already_setup_timeout".into());
             }
             Some(mci) => {
-                mci.defer(ctx).await?;
-                message.edit(*ctx, reply.components(vec!())).await?;
+                let Ok(_) = mci.defer(ctx).await else { return Err("setup_server__failed".into()) };
+                let Ok(_) = message.edit(*ctx, reply.components(vec![])).await else { return Err("setup_server__failed".into()) };
                 match mci.data.custom_id.as_str() {
                     "cancel" => {
-                        message.delete(*ctx).await?;
+                        let Ok(_) = message.delete(*ctx).await else { return Err("setup_server__failed".into()) };
                         return Ok("setup_server__cancelled");
                     }
                     _ => {}
@@ -174,7 +175,7 @@ pub async fn _setup(ctx: &Context<'_>, setup_type: SetupType) -> Result<&'static
         SetupType::PartialSetup => { partial_setup(ctx, &mut server, server_snapshot).await }
     };
 
-    server.update().await?;
+    let Ok(_) = server.update().await else { return Err("setup__server_update_failed".into()) };
 
     match result {
         Ok(_) => { Ok("setup_server__success") }

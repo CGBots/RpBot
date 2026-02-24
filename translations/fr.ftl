@@ -22,6 +22,9 @@ stat_insert__failed = Échec de l'insertion des statistiques
     .title = Ajout de la stat échouée
     .description = La stat n'as pas pu être ajouté.
 #Reply
+reply__reply_success = Succès
+    .title = Succès
+    .message = L'opération a été effectuée avec succès.
 reply__reply_failed = Échec de l'envoi de la réponse
     .title = Réponse échouée
     .description = La réponse à échouée
@@ -140,6 +143,14 @@ setup__continue_setup_message = Continuer la configuration ?
 setup__server_already_setup_timeout = Délai de configuration dépassé
     .title = Délai dépassé
     .message = Le délai pour continuer la configuration a expiré
+partial_setup__get_guild_roles_error = Échec de la récupération des rôles du serveur
+    .title = Erreur de configuration
+    .message = Impossible de récupérer les rôles du serveur.
+            Veuillez réessayer ou contacter le support si le problème persiste : {$support}
+setup__server_not_found = Serveur introuvable
+    .title = Serveur introuvable
+    .message = Ce serveur n'est pas enregistré dans notre base de données.
+            Veuillez réessayer ou contacter le support si le problème persiste : {$support}
 setup_server__cancelled = Configuration annulée
     .title = Configuration annulée
     .message = La configuration du serveur a été annulée
@@ -336,59 +347,86 @@ create_road__success = Route créée
     .message = La route a été créée avec succès
 
 #Create character
-create_character = new_character
-    .description = Command to create new character. Limited to 1 per player.
+create_character = nouveau_personnage
+    .description = Commande pour créer un nouveau personnage. Limité à 1 par joueur.
 
-character_modal_title = Create new character
-create_character__delete_character = Cancel
-create_character__submit_character = Submit
-create_character__modify_character = Modify
-create_character__refuse_character = Refuse
-create_character__accept_character = Accept
-character_special_request = Special request
-character_story = Character's story
-character_description = Physical description
-character_name = Character's name
-create_character__submit_notification = @here A character sheet is awaiting verification :
+character_modal_title = Créer un nouveau personnage
+create_character__delete_character = Annuler
+create_character__submit_character = Envoyer
+create_character__modify_character = Modifier
+create_character__refuse_character = Refuser
+create_character__accept_character = Accepter
+character_special_request = Requêtes spéciales
+character_story = Histoire du personnage
+character_description = Description physique
+character_name = Nom du personnage
+create_character__submit_notification = @here Une fiche de personnage est en attente de vérification :
 
-character_reject_reason = Reject reason
+character_reject_reason = Raison du refus
 
-create_character__no_universe_found = Univere not Found
-    .title = Universe not found
-    .message = There are no existing universe for this server.
-create_character__database_error = DB error
-    .title = Check universes failed
-    .message = Unable to check universes.
-        Please try again or contact support if the problem persists: {$support}
-create_character__character_already_existing = Character already exists
-    .title = Character already exist
-    .message = You already have a character. You can't create another one.
+create_character__no_universe_found = Univers introuvable
+    .title = Univers introuvable
+    .message = Il n'y a pas d'univers existant pour ce serveur.
+create_character__database_error = Erreur de base de données
+    .title = Erreur de base de données
+    .message = Impossible d'accéder à la base de données.
+            Veuillez réessayer ou contacter le support si le problème persiste : {$support}
+create_character__wrong_channel = Mauvais salon
+    .title = Mauvais salon
+    .message = Cette commande doit être utilisée dans le salon des fiches de personnage.
+create_character__character_already_existing = Le personnage existe déjà
+    .title = Le personnage existe déjà
+    .message = Vous avez déjà un personnage. Vous ne pouvez pas en créer un autre.
 CharacterModal = character_modal
-    .character_name = Name
-    .character_description = Character's description
-        .placeholder = test
-    .character_story = Character's story
-        .value = test
-    .character_special_request = Special requests
-create_character__submited = Character sent
-    .title = Character sent
-    .message = Character send to verification. Please wait until validation.
-create_place__character_too_long = Character sheet too long
-    .title = Character sheet too long
-    .message = The character sheet is too long to be displayed. Please try again.
-character_instruction = Fill following fields to describe your character.
-    ► All pragraphs fields are limited to 1500 carracters. The whole character sheet mustn't exceed 4000 caracters.
-    ► A 30 minutes timeout is set by security. But you can always send before what you did and recover it.
-    It's done by cliking on modify button to change it before submiting to moderators.
-create_character__timed_out = Timed out
-    .title = Timed out
-    .message = The modal submit timed out.
-create_character__guild_only = Guild only
-    .title = Guild only
-    .message = This command is reserved to guilds.
-create_character__delete_successfull = Canceled
-    .title = Character creation canceled
-    .message = Your character has successfully been cancelled.
-create_character__not_owner = Not owner
-    .title = Not owner
-    .message = You're not the owner of this character. You can't ask to cancel it.
+    .character_name = Nom
+    .character_description = Description du personnage
+    .placeholder = Décrivez votre personnage ici...
+    .character_story = Histoire du personnage
+    .value = Il était une fois...
+    .character_special_request = Requêtes spéciales
+create_character__submitted = Personnage envoyé
+    .title = Personnage envoyé
+    .message = Votre fiche de personnage a été envoyée pour vérification. Veuillez attendre la décision d'un modérateur.
+create_place__character_too_long = Fiche de personnage trop longue
+    .title = Fiche de personnage trop longue
+    .message = La fiche de personnage est trop longue pour être affichée. Veuillez réessayer.
+character_instruction = Remplissez les champs suivants pour décrire votre personnage.
+    ► Tous les champs de paragraphe sont limités à 1024 caractères.
+    ► Un délai de 30 minutes est configuré par sécurité.
+    Vous pouvez cliquer sur le bouton modifier pour changer votre brouillon avant de l'envoyer aux modérateurs.
+create_character__timed_out = Délai dépassé
+    .title = Délai dépassé
+    .message = Le processus de création de personnage a expiré.
+create_character__guild_only = Serveur uniquement
+    .title = Serveur uniquement
+    .message = Cette commande ne peut être utilisée qu'au sein d'un serveur.
+create_character__delete_successfull = Annulé
+    .title = Création de personnage annulée
+    .message = Votre processus de création de personnage a été annulé avec succès.
+delete_character = Personnage supprimé
+    .title = Personnage supprimé
+    .message = La fiche de personnage a été supprimée avec succès.
+create_character__not_owner = Pas le propriétaire
+    .title = Pas le propriétaire
+    .message = Vous n'êtes pas le propriétaire de ce personnage. Vous ne pouvez pas effectuer cette action.
+create_character__no_member = Membre introuvable
+    .title = Erreur
+    .message = Impossible de trouver les informations du membre.
+create_character__no_permission = Permission refusée
+    .title = Permission refusée
+    .message = Vous n'avez pas les permissions requises (Modérateur ou Administrateur) pour effectuer cette action.
+create_character__invalid_footer = Interaction invalide
+    .title = Erreur
+    .message = Les métadonnées de l'interaction sont invalides.
+create_character__refused = Personnage refusé
+    .title = Personnage refusé
+    .message = Le personnage a été refusé par un modérateur.
+accept_character = Personnage accepté
+    .title = Personnage accepté
+    .message = Le personnage a été accepté avec succès et ajouté à l'univers.
+create_character__type_mismatch = Incompatibilité de type
+    .title = Erreur de validation
+    .message = L'une des valeurs de statistiques fournies ne correspond pas au type attendu.
+create_character__message_not_found = Message introuvable
+    .title = Erreur
+    .message = Impossible de trouver le message original de la fiche de personnage.
