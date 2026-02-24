@@ -1,11 +1,12 @@
 use std::time::Duration;
-use serenity::all::{ButtonStyle, Color, ComponentInteraction, CreateActionRow, CreateButton, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, CreateInputText, CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage, CreateModal, EditMessage, Embed, EmbedField, InputTextStyle, Mentionable, Message, QuickModalResponse};
+use serenity::all::{ButtonStyle, Color, ComponentInteraction, CreateActionRow, CreateButton, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, CreateInputText, CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage, CreateModal, EditMessage, Embed, EmbedField, InputTextStyle, Mentionable, Message, Permissions, QuickModalResponse};
 use serenity::builder::CreateSelectMenu;
 use crate::discord::poise_structs::{Context, Error};
 use crate::utility::reply::reply;
 use serenity::client::Context as SerenityContext;
+use serenity::http::CacheHttp;
 use serenity::utils::CreateQuickModal;
-use crate::database::server::get_server_by_id;
+use crate::database::server::{get_server_by_id, Server};
 use crate::{tr, tr_locale};
 
 pub static CHARACTER_MODAL_TITLE: &str = "character_modal_title";
@@ -14,12 +15,15 @@ pub static DELETE_CHARACTER_BUTTON_CUSTOM_ID: &str = "create_character__delete_c
 pub static SUBMIT_CHARACTER_BUTTON_CUSTOM_ID: &str = "create_character__submit_character";
 pub static ACCEPT_CHARACTER_BUTTON_CUSTOM_ID: &str = "create_character__accept_character";
 pub static REJECT_CHARACTER_BUTTON_CUSTOM_ID: &str = "create_character__refuse_character";
+pub static CREATE_CHARACTER_SUBMIT_NOTIFICATION: &str = "create_character__submit_notification";
 
 pub static CHARACTER_NAME: &str = "character_name";
 pub static CHARACTER_DESCRIPTION: &str = "character_description";
 pub static CHARACTER_STORY: &str = "character_story";
 pub static CHARACTER_SPECIAL_REQUEST: &str = "character_special_request";
 pub static CHARACTER_INSTRUCTION: &str = "character_instruction";
+pub static CHARACTER_REJECT_REASON: &str = "character_reject_reason";
+
 #[poise::command(slash_command, guild_only)]
 pub async fn create_character(
     ctx: Context<'_>
@@ -165,15 +169,30 @@ pub async fn submit_character(ctx: SerenityContext, component_interaction: Compo
         )
     ];
 
-    let message = component_interaction.message;
+    let message = component_interaction.message.clone();
     let embed: CreateEmbed = message.embeds[0].clone().into();
 
     let result_message =
-        component_interaction.channel_id.edit_message(ctx, message.id, EditMessage::new().embed(
+        component_interaction.channel_id.edit_message(ctx.clone(), message.id, EditMessage::new().embed(
             embed.color(Color::from_rgb(0, 255, 0))
         )
             .components(buttons)
         ).await;
+
+    let _ = component_interaction.create_response(ctx.clone(), CreateInteractionResponse::Acknowledge).await;
+
+    let message = tr_locale!(component_interaction.locale.as_str(), CREATE_CHARACTER_SUBMIT_NOTIFICATION) + " " + component_interaction.message.link().as_str();
+
+    if let Some(server) = get_server_by_id(component_interaction.guild_id.unwrap().get()).await? {
+        if let Some(log_channel) = server.log_channel_id {
+            let _ = ctx.http().send_message(
+                log_channel.id.into(),
+                vec![],
+                &CreateMessage::new().content(message),
+            ).await;
+        }
+    }
+
 
     match result_message {
         Ok(_) => {
@@ -297,11 +316,122 @@ pub async fn modify_character(ctx: SerenityContext, component_interaction: Compo
         Err(_) => { Err("create_place__character_too_long".into()) }
     }
  }
-pub async fn refuse_character(ctx: SerenityContext, component_interaction: ComponentInteraction){
-    //TODO
-    println!("refuse_character");
+pub async fn refuse_character(ctx: SerenityContext, component_interaction: ComponentInteraction) -> Result<&'static str, Error> {
+    let member = component_interaction.member.as_ref().unwrap();
+
+    let guild_id = component_interaction.guild_id.unwrap();
+    let server = get_server_by_id(guild_id.get()).await;
+    let server = match server {
+        Ok(result) => {
+            match result {
+                None => { return Err("create_character__no_universe_found".into()) }
+                Some(server) => { server }
+            }
+        }
+        Err(_) => { return Err("create_character__database_error".into()) }
+    };
+
+    let has_admin_permission = member.permissions.map_or(false, |p| p.contains(Permissions::ADMINISTRATOR));
+    let has_moderator_role = server.moderator_role_id.map_or(false, |role| member.roles.contains(&role.id.into()));
+    let has_admin_role = server.admin_role_id.map_or(false, |role| member.roles.contains(&role.id.into()));
+
+    if !has_admin_permission && !has_moderator_role && !has_admin_role {
+        let _ = component_interaction.create_response(ctx.clone(), CreateInteractionResponse::Message(
+            CreateInteractionResponseMessage::new().content(tr_locale!(component_interaction.locale.as_str(), "create_character__no_permission")).ephemeral(true)
+        )).await?;
+        return Err("create_character__no_permission".into());
+    }
+
+
+
+
+
+    let modal = CreateQuickModal::new(tr_locale!(component_interaction.locale.as_str(), CHARACTER_MODAL_TITLE))
+        .field(
+            CreateInputText::new(InputTextStyle::Paragraph, tr_locale!(component_interaction.locale.as_str(), CHARACTER_REJECT_REASON), CHARACTER_REJECT_REASON)
+                .required(false).max_length(864)
+        )
+        .timeout(Duration::from_secs(30));
+
+    let interaction = component_interaction.quick_modal(&ctx, modal).await?;
+    let modal_response = match interaction {
+        Some(interaction) => {
+            interaction.interaction.create_response(ctx.clone(), CreateInteractionResponse::Acknowledge).await?;
+            interaction }
+        None => {
+            return Err("create_character__timed_out".into()) }
+    };
+
+    let inputs = modal_response.inputs.clone();
+
+    let buttons = vec![
+        CreateActionRow::Buttons(
+            vec![
+                CreateButton::new(SUBMIT_CHARACTER_BUTTON_CUSTOM_ID).label(tr_locale!(modal_response.interaction.locale.as_str(), SUBMIT_CHARACTER_BUTTON_CUSTOM_ID)).style(ButtonStyle::Success),
+                CreateButton::new(MODIFY_CHARACTER_BUTTON_CUSTOM_ID).label(tr_locale!(modal_response.interaction.locale.as_str(), MODIFY_CHARACTER_BUTTON_CUSTOM_ID)).style(ButtonStyle::Primary),
+                CreateButton::new(DELETE_CHARACTER_BUTTON_CUSTOM_ID).label(tr_locale!(modal_response.interaction.locale.as_str(), DELETE_CHARACTER_BUTTON_CUSTOM_ID)).style(ButtonStyle::Danger),
+            ]
+        )
+    ];
+
+    let interaction = modal_response.interaction.clone();
+
+    let result_message = if let Some(message) = modal_response.interaction.message {
+        let mut embed_fields = component_interaction.message.embeds[0].clone().fields;
+        embed_fields.push(EmbedField::new(tr_locale!(component_interaction.locale.as_str(), CHARACTER_REJECT_REASON), inputs[0].clone(), false));
+
+        let embed_fields: Vec<(String, String, bool)> = embed_fields
+            .iter()
+            .map(|field| (field.name.clone(), field.value.clone(), field.inline))
+            .collect();
+
+        let mess = modal_response.interaction.channel_id.edit_message(ctx, message.id, EditMessage::new().embed(
+            CreateEmbed::new()
+                .footer(CreateEmbedFooter::new(message.embeds.get(0).unwrap().footer.clone().unwrap().text.as_str()))
+                .title(inputs[0].clone())
+                .fields(embed_fields)
+                .author(CreateEmbedAuthor::new(component_interaction.user.name.as_str()))
+                .color(Color::from_rgb(255, 0, 0))
+        )
+            .components(buttons)
+        ).await;
+        mess
+    }
+        else{return Err("create_character__message_not_found".into())};
+
+    match result_message {
+        Ok(_) => {
+            Ok("create_character__submited")
+        }
+        Err(_) => { Err("create_place__character_too_long".into()) }
+    }
 }
-pub async fn accept_character(ctx: SerenityContext, component_interaction: ComponentInteraction){
-    //TODO
+pub async fn accept_character(ctx: SerenityContext, component_interaction: ComponentInteraction) -> Result<&'static str, Error> {
+    let member = component_interaction.member.as_ref().unwrap();
+
+    let guild_id = component_interaction.guild_id.unwrap();
+    let server = get_server_by_id(guild_id.get()).await;
+    let server = match server {
+        Ok(result) => {
+            match result {
+                None => { return Err("create_character__no_universe_found".into()) }
+                Some(server) => { server }
+            }
+        }
+        Err(_) => { return Err("create_character__database_error".into()) }
+    };
+
+    let has_admin_permission = member.permissions.map_or(false, |p| p.contains(Permissions::ADMINISTRATOR));
+    let has_moderator_role = server.moderator_role_id.map_or(false, |role| member.roles.contains(&role.id.into()));
+    let has_admin_role = server.admin_role_id.map_or(false, |role| member.roles.contains(&role.id.into()));
+
+    if !has_admin_permission && !has_moderator_role && !has_admin_role {
+        let _ = component_interaction.create_response(ctx.clone(), CreateInteractionResponse::Message(
+            CreateInteractionResponseMessage::new().content(tr_locale!(component_interaction.locale.as_str(), "create_character__no_permission")).ephemeral(true)
+        )).await?;
+        return Err("create_character__no_permission".into());
+    }
+
     println!("accept_character");
+    Ok("accept_character")
 }

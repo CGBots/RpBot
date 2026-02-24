@@ -349,6 +349,9 @@ character_special_request = Special request
 character_story = Character's story
 character_description = Physical description
 character_name = Character's name
+create_character__submit_notification = @here A character sheet is awaiting verification:
+
+character_reject_reason = Reject reason
 
 create_character__no_universe_found = Univere not Found
     .title = Universe not found
@@ -356,21 +359,23 @@ create_character__no_universe_found = Univere not Found
 create_character__database_error = DB error
     .title = Check universes failed
     .message = Unable to check universes.
-    Please try again or contact support if the problem persists: {$support}
+            Please try again or contact support if the problem persists: {$support}
 create_character__character_already_existing = Character already exists
     .title = Character already exist
     .message = You already have a character. You can't create another one.
 CharacterModal = character_modal
     .character_name = Name
     .character_description = Character's description
+    .placeholder = test
     .character_story = Character's story
+    .value = test
     .character_special_request = Special requests
 create_character__submited = Character sent
     .title = Character sent
     .message = Character send to verification. Please wait until validation.
 create_place__character_too_long = Character sheet too long
     .title = Character sheet too long
-    .message = The character sheet is too long to be displayed. Please do something shorter.
+    .message = The character sheet is too long to be displayed. Please try again.
 character_instruction = Fill following fields to describe your character.
     ► All pragraphs fields are limited to 1500 carracters. The whole character sheet mustn't exceed 4000 caracters.
     ► A 30 minutes timeout is set by security. But you can always send before what you did and recover it.

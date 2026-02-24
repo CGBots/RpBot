@@ -349,6 +349,9 @@ character_special_request = Special request
 character_story = Character's story
 character_description = Physical description
 character_name = Character's name
+create_character__submit_notification = @here A character sheet is awaiting verification :
+
+character_reject_reason = Reject reason
 
 create_character__no_universe_found = Univere not Found
     .title = Universe not found
