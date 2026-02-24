@@ -6,4 +6,4 @@ pub mod modifiers;
 pub mod places;
 pub mod stats;
 pub mod road;
-pub mod players;
+pub mod characters;

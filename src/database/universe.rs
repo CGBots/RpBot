@@ -1,6 +1,6 @@
 use futures::TryStreamExt;
 use crate::database::db_client::{DB_CLIENT, connect_db};
-use crate::database::db_namespace::{PLAYER_COLLECTION_NAME, RPBOT_DB_NAME, SERVER_COLLECTION_NAME, STATS_COLLECTION_NAME, UNIVERSE_COLLECTION_NAME};
+use crate::database::db_namespace::{CHARACTER_COLLECTION_NAME, RPBOT_DB_NAME, SERVER_COLLECTION_NAME, STATS_COLLECTION_NAME, UNIVERSE_COLLECTION_NAME};
 use mongodb::bson::{doc, from_document};
 use mongodb::bson::oid::ObjectId;
 use mongodb::{Cursor, IndexModel};
@@ -9,7 +9,7 @@ use mongodb::results::{CreateIndexResult, InsertOneResult};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use tokio::join;
-use crate::database::players::Character;
+use crate::database::characters::Character;
 use crate::database::server::{Server};
 use crate::database::stats::Stat;
 use crate::discord::poise_structs::Error;
@@ -516,12 +516,13 @@ impl Universe {
         Ok(true)
     }
 
-    pub async fn get_stats(self) -> mongodb::error::Result<Cursor<Stat>>{
-        let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }) .await .clone();
+    pub async fn get_stats(self) -> mongodb::error::Result<Cursor<Stat>> {
+        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+        let filter = doc!{"universe_id": self.universe_id};
         db_client
             .database(self.universe_id.to_string().as_str())
             .collection::<Stat>(STATS_COLLECTION_NAME)
-            .find(doc!{})
+            .find(filter)
             .await
     }
 
@@ -530,7 +531,7 @@ impl Universe {
         let filter = doc!{};
         db_client
             .database(self.universe_id.to_string().as_str())
-            .collection::<Character>(PLAYER_COLLECTION_NAME)
+            .collection::<Character>(CHARACTER_COLLECTION_NAME)
             .find_one(filter)
             .await
     }

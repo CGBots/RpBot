@@ -1,13 +1,16 @@
+use futures::{StreamExt, TryStreamExt};
 use std::time::Duration;
-use serenity::all::{ButtonStyle, Color, ComponentInteraction, CreateActionRow, CreateButton, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, CreateInputText, CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage, CreateModal, EditMessage, Embed, EmbedField, InputTextStyle, Mentionable, Message, Permissions, QuickModalResponse};
-use serenity::builder::CreateSelectMenu;
+use serenity::all::{ButtonStyle, Color, ComponentInteraction, CreateActionRow, CreateButton, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, CreateInputText, CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage, CreateModal, EditMessage, Embed, EmbedField, InputTextStyle, Mentionable, Message, ModalInteraction, Permissions, QuickModalResponse};
 use crate::discord::poise_structs::{Context, Error};
 use crate::utility::reply::reply;
 use serenity::client::Context as SerenityContext;
 use serenity::http::CacheHttp;
 use serenity::utils::CreateQuickModal;
-use crate::database::server::{get_server_by_id, Server};
+use crate::database::server::{get_server_by_id};
 use crate::{tr, tr_locale};
+use crate::database::characters::Character;
+use crate::database::stats::{Stat, StatValue};
+use crate::database::universe::get_universe_by_id;
 
 pub static CHARACTER_MODAL_TITLE: &str = "character_modal_title";
 pub static MODIFY_CHARACTER_BUTTON_CUSTOM_ID: &str = "create_character__modify_character";
@@ -61,7 +64,17 @@ pub async fn _create_character(ctx: Context<'_>) -> Result<&'static str, Error>{
     let player_result = server.has_character(ctx.author().id.get()).await?;
     match player_result {
         None => {}
-        Some(_) => {return Err("create_character__character_already_existing".into())}
+        Some(_) => {
+            ctx.send(poise::CreateReply::default()
+                .embed(CreateEmbed::new()
+                    .color(Color::from_rgb(255, 0, 0))
+                    .title(crate::translation::get(ctx, "create_character__character_already_existing", Some("title"), None))
+                    .description(crate::translation::get(ctx, "create_character__character_already_existing", Some("message"), None))
+                )
+                .ephemeral(true)
+            ).await?;
+            return Ok("create_character__character_already_existing")
+        }
     }
 
     let app_ctx = match ctx.clone() {
@@ -98,7 +111,7 @@ pub async fn _create_character(ctx: Context<'_>) -> Result<&'static str, Error>{
     };
 
     let inputs = modal_response.inputs;
-    
+
     let buttons = vec![
         CreateActionRow::Buttons(
             vec![
@@ -108,7 +121,7 @@ pub async fn _create_character(ctx: Context<'_>) -> Result<&'static str, Error>{
             ]
         )
     ];
-    
+
     let result_message = app_ctx.channel_id().send_message(ctx, CreateMessage::new().embed(
         CreateEmbed::new()
             .footer(CreateEmbedFooter::new(ctx.author().id.get().to_string()))
@@ -121,7 +134,7 @@ pub async fn _create_character(ctx: Context<'_>) -> Result<&'static str, Error>{
     )
         .components(buttons)
     ).await;
-    
+
     match result_message {
         Ok(_) => {
             Ok("create_character__submited")
@@ -136,7 +149,7 @@ pub async fn delete_character(ctx: SerenityContext, component_interaction: Compo
     let user = user_id_string.as_str();
     let character = interaction.message.embeds[0].clone().footer.unwrap();
     let character_user = character.text.as_str();
-    
+
     if user != character_user{
         let _ = component_interaction.create_response(ctx, CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new().content(tr_locale!(component_interaction.locale.as_str(), "create_character__not_owner")).ephemeral(true)
@@ -342,10 +355,6 @@ pub async fn refuse_character(ctx: SerenityContext, component_interaction: Compo
         return Err("create_character__no_permission".into());
     }
 
-
-
-
-
     let modal = CreateQuickModal::new(tr_locale!(component_interaction.locale.as_str(), CHARACTER_MODAL_TITLE))
         .field(
             CreateInputText::new(InputTextStyle::Paragraph, tr_locale!(component_interaction.locale.as_str(), CHARACTER_REJECT_REASON), CHARACTER_REJECT_REASON)
@@ -432,6 +441,182 @@ pub async fn accept_character(ctx: SerenityContext, component_interaction: Compo
         return Err("create_character__no_permission".into());
     }
 
-    println!("accept_character");
+    let universe = get_universe_by_id(server.universe_id.to_string()).await?;
+    let stats_cursor = universe.unwrap().get_stats().await?;
+    let stats: Vec<Stat> = stats_cursor.try_collect().await.unwrap();
+
+    let mut quick_modal = CreateQuickModal::new(tr_locale!(component_interaction.locale.as_str(), CHARACTER_MODAL_TITLE));
+
+    let mut text = "".to_string();
+    for stat in stats.clone() {
+        text += (stat.name.to_string() + ": [".into() + format!("{:?}", stat.base_value).as_str() + "]\n".into()).as_str();
+    };
+    quick_modal = quick_modal.field(CreateInputText::new(InputTextStyle::Paragraph, "test", "test").value(text).required(true));
+
+    let interaction = component_interaction.quick_modal(&ctx, quick_modal).await?;
+
+    let mut extracted_stats: Vec<Stat> = Vec::new();
+
+    match interaction {
+        Some(interaction) => {
+            for stat in stats.iter() {
+                let input = interaction.inputs[0].clone();
+
+                let mut line_matched = std::collections::HashSet::new();
+                for line in input.lines() {
+                    for stat in stats.iter() {
+                        if line.contains(&stat.name) {
+                            line_matched.insert(stat.name.clone());
+                            if let Some(colon_pos) = line.find(':') {
+                                let value_str = line[colon_pos + 1..].trim();
+                                let parsed_value = match &stat.base_value {
+                                    StatValue::I64(_) => {
+                                        value_str.parse::<i64>().ok().map(StatValue::I64)
+                                    }
+                                    StatValue::F64(_) => {
+                                        value_str.parse::<f64>().ok().map(StatValue::F64)
+                                    }
+                                    StatValue::String(_) => {
+                                        Some(StatValue::String(value_str.to_string()))
+                                    }
+                                    StatValue::Bool(_) => {
+                                        value_str.parse::<bool>().ok().map(StatValue::Bool)
+                                    }
+                                };
+                                if let Some(value) = parsed_value {
+                                    let stat_with_value = Stat {
+                                        _id: Default::default(),
+                                        universe_id: Default::default(),
+                                        name: stat.name.clone(),
+                                        base_value: value,
+                                        formula: stat.formula.clone(),
+                                        min: stat.min.clone(),
+                                        max: stat.max.clone(),
+                                        modifiers: vec![],
+                                    };
+                                    extracted_stats.push(stat_with_value);
+                                } else {
+                                    interaction.interaction.create_response(ctx.clone(), CreateInteractionResponse::Message(
+                                        CreateInteractionResponseMessage::new()
+                                            .embed(CreateEmbed::new()
+                                                .color(Color::from_rgb(255, 0, 0))
+                                                .title(tr_locale!(component_interaction.locale.as_str(), "create_character__validation_error"))
+                                                .description(format!("{}: {}", stat.name, tr_locale!(component_interaction.locale.as_str(), "create_character__type_mismatch")))
+                                            ).ephemeral(true)
+                                    )).await?;
+                                    return Err("create_character__type_mismatch".into());
+                                }
+                            } else {
+                                let parsed_value = match &stat.base_value {
+                                    StatValue::I64(_) => {
+                                        line.trim().parse::<i64>().ok().map(StatValue::I64)
+                                    }
+                                    StatValue::F64(_) => {
+                                        line.trim().parse::<f64>().ok().map(StatValue::F64)
+                                    }
+                                    StatValue::String(_) => {
+                                        Some(StatValue::String(line.trim().to_string()))
+                                    }
+                                    StatValue::Bool(_) => {
+                                        line.trim().parse::<bool>().ok().map(StatValue::Bool)
+                                    }
+                                };
+                                if let Some(value) = parsed_value {
+                                    let stat_with_value = Stat {
+                                        _id: Default::default(),
+                                        universe_id: Default::default(),
+                                        name: stat.name.clone(),
+                                        base_value: value,
+                                        formula: stat.formula.clone(),
+                                        min: stat.min.clone(),
+                                        max: stat.max.clone(),
+                                        modifiers: vec![],
+                                    };
+                                    extracted_stats.push(stat_with_value);
+                                } else {
+                                    interaction.interaction.create_response(ctx.clone(), CreateInteractionResponse::Message(
+                                        CreateInteractionResponseMessage::new()
+                                            .embed(CreateEmbed::new()
+                                                .color(Color::from_rgb(255, 0, 0))
+                                                .title(tr_locale!(component_interaction.locale.as_str(), "create_character__validation_error"))
+                                                .description(format!("{}: {}", stat.name, tr_locale!(component_interaction.locale.as_str(), "create_character__type_mismatch")))
+                                            ).ephemeral(true)
+                                    )).await?;
+                                    return Err("create_character__type_mismatch".into());
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+                for stat in stats.iter() {
+                    if !line_matched.contains(&stat.name) {
+                        extracted_stats.push(stat.clone());
+                    }
+                }
+            }
+            interaction.interaction.create_response(ctx.clone(), CreateInteractionResponse::Acknowledge).await?;
+        }
+        None => {
+            return Err("create_character__timed_out".into());
+        }
+    }
+
+
+    let character_user_id = component_interaction.message.embeds[0]
+        .footer.as_ref()
+        .unwrap()
+        .text.parse::<u64>()
+        .unwrap();
+
+    let character_name = component_interaction.message.embeds[0]
+        .title.as_ref()
+        .unwrap()
+        .clone();
+
+    let embed_fields = &component_interaction.message.embeds[0].fields;
+    let description = embed_fields.iter()
+        .find(|f| f.name == tr_locale!(component_interaction.locale.as_str(), CHARACTER_DESCRIPTION))
+        .map(|f| f.value.clone())
+        .unwrap_or_default();
+
+    let story = embed_fields.iter()
+        .find(|f| f.name == tr_locale!(component_interaction.locale.as_str(), CHARACTER_STORY))
+        .map(|f| f.value.clone())
+        .unwrap_or_default();
+
+    let special_request = embed_fields.iter()
+        .find(|f| f.name == tr_locale!(component_interaction.locale.as_str(), CHARACTER_SPECIAL_REQUEST))
+        .map(|f| f.value.clone())
+        .unwrap_or_default();
+
+
+
+    let character = Character {
+        _id: Default::default(), // Assuming `_id` is an `Option<T>` or an equivalent type
+        user_id: character_user_id,
+        universe_id: server.universe_id,
+        name: character_name,
+        stats: extracted_stats, // Assuming `extracted_stats` matches the `stats` field's type
+    };
+
+    character.update().await?;
+
+    if let Some(player_role_id) = server.player_role_id {
+        if let Ok(mut member) = ctx.http().get_member(guild_id, character_user_id.into()).await {
+            let _ = member.add_role(&ctx.http(), player_role_id.id).await;
+        }
+    }
+
+    let message = component_interaction.message.clone();
+    let original_embed: CreateEmbed = message.embeds[0].clone().into();
+    let _ = component_interaction.channel_id.edit_message(
+        ctx,
+        message.id,
+        EditMessage::new().components(vec![]).embed(
+            original_embed.color(Color::from_rgb(0, 0, 255))
+        ),
+    ).await;
+
     Ok("accept_character")
 }

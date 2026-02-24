@@ -3,7 +3,7 @@ use crate::database::universe::{Universe};
 use crate::discord::poise_structs::*;
 use crate::database::server::{get_server_by_id, Server};
 use crate::database::stats::{Stat, SPEED_STAT};
-use crate::database::stats::StatValue::Int;
+use crate::database::stats::StatValue::I64;
 use crate::universe::setup::setup_sub_command::{SetupType, _setup};
 use crate::utility::reply::reply;
 
@@ -141,10 +141,10 @@ pub async fn _create_universe(
         _id: Default::default(),
         universe_id: universe.universe_id,
         name: SPEED_STAT.to_string(),
-        base_value: Int(3),
+        base_value: I64(3),
         formula: None,
-        min: Some(Int(0)),
-        max: Some(Int(999)),
+        min: Some(I64(0)),
+        max: Some(I64(999)),
         modifiers: vec![],
     };
 

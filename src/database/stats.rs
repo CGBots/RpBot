@@ -80,21 +80,18 @@ pub static SPEED_STAT: &str = "speed";
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialOrd, PartialEq)]
 pub enum StatValue {
-    Int(u32),
-    Float(f32),
-    Text(String),
-    Bool(bool)
+    pub I64(i64),
+    pub F64(f64),
+    pub String(String),
+    pub Bool(bool)
 }
 
+pub type StatValueInt = i64;
+pub type StatValueFloat = f64;
+pub type StatValueText = String;
+pub type StatValueBool = bool;
+
 impl StatValue {
-    pub fn to_dynamic(&self) -> rhai::Dynamic {
-        match self {
-            StatValue::Int(v) => rhai::Dynamic::from(*v as i64),
-            StatValue::Float(v) => rhai::Dynamic::from(*v as f64),
-            StatValue::Text(v) => rhai::Dynamic::from(v.clone()),
-            StatValue::Bool(v) => rhai::Dynamic::from(*v),
-        }
-    }
 }
 
 /// Represents a `Stat` structure, which holds information about a specific statistical
