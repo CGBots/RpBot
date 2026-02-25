@@ -487,9 +487,9 @@ impl Server {
         snapshot
     }
 
-    pub async fn get_player_by_user_id(self, user_id: u64) -> mongodb::error::Result<Option<Character>> {
+    pub async fn get_character_by_user_id(self, user_id: u64) -> mongodb::error::Result<Option<Character>> {
         let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }) .await .clone();
-        let filter = doc!{};
+        let filter = doc!{"user_id": user_id.to_string()};
         db_client
             .database(self.universe_id.to_string().as_str())
             .collection::<Character>(CHARACTER_COLLECTION_NAME)
@@ -498,7 +498,7 @@ impl Server {
     }
 
     pub async fn has_character(self, user_id: u64) -> mongodb::error::Result<Option<Character>> {
-        let player_result = self.get_player_by_user_id(user_id).await;
+        let player_result = self.get_character_by_user_id(user_id).await;
         match player_result {
             Ok(None) => { Ok(None) }
             Ok(Some(character)) => { Ok(Some(character)) }

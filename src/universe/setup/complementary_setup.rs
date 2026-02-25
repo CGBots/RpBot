@@ -1,5 +1,4 @@
-use log::{log, Level};
-use serenity::all::{ChannelType, GuildChannel};
+use serenity::all::{ChannelType};
 use crate::database::server::{Id, IdType, Server};
 use crate::discord::channels::{create_channel, get_admin_category_permission_set, get_rp_character_permission_set};
 use crate::discord::poise_structs::{Context, Error};

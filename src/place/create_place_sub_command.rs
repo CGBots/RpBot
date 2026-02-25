@@ -1,7 +1,7 @@
 use serenity::all::{CreateChannel, EditRole, PermissionOverwrite, PermissionOverwriteType, Permissions, RoleId};
 use serenity::all::ChannelType::Category;
 use crate::database::places::Place;
-use crate::database::server::{get_server_by_id, Server};
+use crate::database::server::{get_server_by_id};
 use crate::discord::poise_structs::{Context, Error};
 use crate::utility::reply::reply;
 

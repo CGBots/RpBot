@@ -1,7 +1,7 @@
 use log::log;
-use poise::{CreateReply};
-use serenity::all::{Color, CreateEmbed, CreateEmbedFooter, CreateMessage};
+use serenity::all::{Color, CreateEmbed, CreateEmbedFooter};
 use crate::discord::poise_structs::{Context, Error};
+use poise::CreateReply;
 
 /// Sends an embed-based reply to a user based on the result provided, with appropriate styling
 /// (green for success and red for failure) and localized content.
@@ -61,8 +61,7 @@ pub async fn reply<'a>(
         Err(error) => (Color::from_rgb(255, 0, 0), error.to_string()),
     };
 
-    match ctx.channel_id().send_message(ctx,
-        CreateMessage::default().embed(
+    match ctx.send(CreateReply::default().embed(
             CreateEmbed::new()
                 .title(crate::translation::get(ctx, &string, Some("title"), None))
                 .description(crate::translation::get(ctx, &string, Some("message"), None))
@@ -72,8 +71,8 @@ pub async fn reply<'a>(
     )
         .await {
         Ok(_) => {Ok("reply__reply_success")}
-        Err(_) => {
-            log!(log::Level::Error, "failed to reply:\nserver: {:?}\nerror_string: {}", ctx.guild_id(), string);
+        Err(e) => {
+            log!(log::Level::Error, "failed to reply:\nserver: {:?}\nerror_string: {}\nerror: {:?}", ctx.guild_id(), string, e);
             Err("reply__reply_failed".into())}
     }
 }

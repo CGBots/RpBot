@@ -11,8 +11,8 @@ start = start
     .description = Affiche les instruction de démarrage dans le salon actuel.
 start_message = Start Message
     .title = Merci d'utiliser
-    .message = Pour commencer à utiliser le bot, commencez par créer un nouvel univers.
-    Utilisez la commande `/{$universe} {$create_universe} [nom de votre univers] [type de setup]`
+    .description = Pour commencer à utiliser le bot, commencez par créer un nouvel univers.
+    Utilisez la commande `/{universe} {create_universe} [nom de votre univers] [type de setup]`
     Le type de setup détermine quels salons seront créés.
     Dans un setup partiel, seule la catégorie route et les rôles seront créés.
     Dans un setup complet, les catégories Admin, hors rp, rp et leurs selons sont également créés en plus.
@@ -360,6 +360,7 @@ character_special_request = Requêtes spéciales
 character_story = Histoire du personnage
 character_description = Description physique
 character_name = Nom du personnage
+create_character__start_place = Lieu de départ
 create_character__submit_notification = @here Une fiche de personnage est en attente de vérification :
 
 character_reject_reason = Raison du refus
@@ -427,6 +428,8 @@ accept_character = Personnage accepté
 create_character__type_mismatch = Incompatibilité de type
     .title = Erreur de validation
     .message = L'une des valeurs de statistiques fournies ne correspond pas au type attendu.
-create_character__message_not_found = Message introuvable
-    .title = Erreur
-    .message = Impossible de trouver le message original de la fiche de personnage.
+create_character__invalid_place_selected = Lieu invalide sélectionné. Veuillez choisir une catégorie valide pour le personnage.
+create_character__invalid_interaction = Données d'interaction invalides.
+create_character__choose_place = Choisir un lieu
+    .title = Choisir un lieu
+    .message = Veuillez sélectionner la catégorie où le personnage sera situé.

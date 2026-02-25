@@ -18,9 +18,8 @@
 //! This module primarily supports applications where localization for commands and messaging is necessary,
 //! such as bots or internationalized software systems.
 use std::collections::HashMap;
-use std::ops::Deref;
 use std::path::Path;
-use crate::{translation, Context, Data, Error};
+use crate::{Context, Data, Error};
 use fluent::{FluentArgs, FluentValue};
 use fluent::bundle::FluentBundle;
 use fluent::FluentResource;

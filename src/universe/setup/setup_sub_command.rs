@@ -1,6 +1,6 @@
 use poise::{CreateReply};
 use serenity::all::{ButtonStyle, Color, ComponentInteractionCollector, CreateActionRow, CreateButton, CreateEmbed};
-use crate::database::server::{get_server_by_id, Server};
+use crate::database::server::{get_server_by_id};
 use crate::discord::poise_structs::{Context, Error};
 use crate::tr;
 use crate::universe::setup::full_setup::full_setup;

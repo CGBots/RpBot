@@ -9,10 +9,11 @@ ping = ping
 
 start = start
     .description = Displays startup instructions in the current channel.
+
 start_message = Start Message
     .title = Thank you for using
-    .message = To start using the bot, begin by creating a new universe.
-            Use the command `/{$universe} {$create_universe} [your universe name] [setup type]`
+    .description = To start using the bot, begin by creating a new universe.
+            Use the command `/{universe} {create_universe} [your universe name] [setup type]`
             The setup type determines which channels will be created.
             In a partial setup, only the road category and roles will be created.
             In a full setup, the Admin, out of rp, rp categories and their channels are also created.
@@ -360,6 +361,7 @@ character_special_request = Special request
 character_story = Character's story
 character_description = Physical description
 character_name = Character's name
+create_character__start_place = Starting place
 create_character__submit_notification = @here A character sheet is awaiting verification:
 
 character_reject_reason = Reject reason
@@ -427,6 +429,8 @@ accept_character = Character accepted
 create_character__type_mismatch = Type mismatch
     .title = Validation error
     .message = One of the stat values provided does not match the expected type.
-create_character__message_not_found = Message not found
-    .title = Error
-    .message = Unable to find the original character sheet message.
+create_character__invalid_place_selected = Invalid place selected. Please choose a valid category for the character.
+create_character__invalid_interaction = Invalid interaction data.
+create_character__choose_place = Choose a place
+    .title = Choose a place
+    .message = Please select the category where the character will be located.
