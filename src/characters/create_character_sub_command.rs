@@ -639,8 +639,6 @@ pub async fn accept_character(ctx: SerenityContext, component_interaction: Compo
         ),
     ).await;
 
-    println!("{:?}", stats[0].clone().resolve(component_interaction.channel.unwrap().parent_id.unwrap().get(), component_interaction.user.id.get()).await);
-
     Ok("accept_character")
 }
 
@@ -721,7 +719,6 @@ pub async fn choose_character_place(ctx: SerenityContext, component_interaction:
                 .field(tr_locale!(component_interaction.locale.as_str(), "create_character__start_place"), place.name, false)
         ),
     ).await;
-    println!("{}", selected_category_id.mention().to_string().as_str());
 
     Ok("accept_character")
 }
