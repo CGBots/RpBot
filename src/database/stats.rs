@@ -42,8 +42,10 @@ use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use crate::database::db_client::{connect_db, DB_CLIENT};
-use crate::database::db_namespace::STATS_COLLECTION_NAME;
-use crate::database::modifiers::Modifier;
+use crate::database::db_namespace::{CHARACTER_COLLECTION_NAME, PLACES_COLLECTION_NAME, STATS_COLLECTION_NAME};
+use crate::database::modifiers::{Modifier, ModifierType};
+use crate::database::characters::Character;
+use crate::database::places::Place;
 use crate::discord::poise_structs::Error;
 
 pub static SPEED_STAT: &str = "speed";
@@ -78,7 +80,7 @@ pub static SPEED_STAT: &str = "speed";
 /// This attribute may be used in conjunction with additional Serde annotations to 
 /// customize how the enum and its variants are serialized/deserialized.
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone, PartialOrd, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum StatValue {
     pub I64(i64),
     pub F64(f64),
@@ -86,12 +88,21 @@ pub enum StatValue {
     pub Bool(bool)
 }
 
-pub type StatValueInt = i64;
-pub type StatValueFloat = f64;
-pub type StatValueText = String;
-pub type StatValueBool = bool;
-
 impl StatValue {
+    pub fn as_f64(&self) -> f64 {
+        match self {
+            StatValue::I64(v) => *v as f64,
+            StatValue::F64(v) => *v,
+            StatValue::String(s) => s.parse().unwrap_or(0.0),
+            StatValue::Bool(b) => if *b { 1.0 } else { 0.0 },
+        }
+    }
+}
+
+impl PartialOrd for StatValue {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.as_f64().partial_cmp(&other.as_f64())
+    }
 }
 
 /// Represents a `Stat` structure, which holds information about a specific statistical
@@ -331,5 +342,75 @@ impl Stat {
             }
         }
         true
+    }
+
+    pub async fn resolve(self, category_id: u64, user_id: u64) -> Result<StatValue, Error> {
+        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+        let db = db_client.database(&self.universe_id.to_string());
+
+        // 1. Recover stat in the universe (global)
+        let universe_stat = db.collection::<Stat>(STATS_COLLECTION_NAME)
+            .find_one(doc! { "name": &self.name })
+            .await.unwrap_or_else(|_| None);
+
+        // 2. Recover location stat/modifiers
+        let place = db.collection::<Place>(PLACES_COLLECTION_NAME)
+            .find_one(doc! { "category_id": category_id.to_string() })
+            .await.unwrap_or_else(|_| None);
+
+        // 3. Recover player stat/modifiers
+        let character = match db.collection::<Character>(CHARACTER_COLLECTION_NAME)
+            .find_one(doc! { "user_id": user_id.to_string() })
+            .await {
+                Ok(res) => res,
+                Err(_) => return Err("resolve_stat__character_not_found".into())
+            };
+
+        let mut multipliers = 1.0;
+        let mut bases = 0.0;
+        let mut flats = 0.0;
+
+        let mut process_modifiers = |modifiers: &[Modifier]| {
+            for modifier in modifiers {
+                if modifier.stat == self._id {
+                    match modifier.modifier_type {
+                        ModifierType::Multiplier => multipliers *= modifier.value.as_f64(),
+                        ModifierType::Base => bases += modifier.value.as_f64(),
+                        ModifierType::Flats => flats += modifier.value.as_f64(),
+                    }
+                }
+            }
+        };
+
+        // Extract modifiers from Universe stat
+        if let Some(u_stat) = universe_stat {
+            process_modifiers(&u_stat.modifiers);
+        }
+
+        // Extract modifiers from Place
+        if let Some(p) = place {
+            process_modifiers(&p.modifiers);
+        }
+
+        let mut x = 0.0;
+        // Extract modifiers from Character's stat
+        if let Some(c) = character {
+            if let Some(c_stat) = c.stats.iter().find(|s| s.name == self.name) {
+                process_modifiers(&c_stat.modifiers);
+                x = c_stat.base_value.as_f64();
+            }
+        }
+
+        // Also include modifiers from the current Stat instance itself
+        process_modifiers(&self.modifiers);
+
+        // Calculate final value: a*(x+b)+c
+        // a = multipliers, b = bases, c = flats, x = self.base_value
+        let result = multipliers * (x + bases) + flats;
+
+        match self.base_value {
+            StatValue::I64(_) => Ok(StatValue::I64(result.round() as i64)),
+            _ => Ok(StatValue::F64(result)),
+        }
     }
 }

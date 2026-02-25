@@ -3,15 +3,22 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use crate::database::stats::StatValue;
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum ModifierType{
+    Base,
+    Multiplier,
+    Flats
+}
+
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Modifier{
     pub priority: i32,
     pub stat: ObjectId,
-    pub variable_name: String,
     pub value: StatValue,
-    pub formula: String,
+    pub modifier_type: ModifierType,
     pub end_timestamp: Option<u64>,
+    pub source: ObjectId
 }
 
 impl Modifier{
