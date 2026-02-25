@@ -363,54 +363,75 @@ impl Stat {
             .find_one(doc! { "user_id": user_id.to_string() })
             .await {
                 Ok(res) => res,
-                Err(_) => return Err("resolve_stat__character_not_found".into())
+                Err(_) => return Err("resolve_stat__database_error".into())
             };
 
         let mut multipliers = 1.0;
         let mut bases = 0.0;
         let mut flats = 0.0;
 
-        let mut process_modifiers = |modifiers: &[Modifier]| {
+        let stat_id = self._id;
+        let apply_modifiers = |modifiers: &[Modifier], multipliers: &mut f64, bases: &mut f64, flats: &mut f64| {
             for modifier in modifiers {
-                if modifier.stat == self._id {
+                if modifier.stat == stat_id {
                     match modifier.modifier_type {
-                        ModifierType::Multiplier => multipliers *= modifier.value.as_f64(),
-                        ModifierType::Base => bases += modifier.value.as_f64(),
-                        ModifierType::Flats => flats += modifier.value.as_f64(),
+                        ModifierType::Multiplier => *multipliers *= modifier.value.as_f64(),
+                        ModifierType::Base => *bases += modifier.value.as_f64(),
+                        ModifierType::Flats => *flats += modifier.value.as_f64(),
                     }
                 }
             }
         };
 
-        // Extract modifiers from Universe stat
-        if let Some(u_stat) = universe_stat {
-            process_modifiers(&u_stat.modifiers);
-        }
+        let mut value = self.base_value.as_f64();
 
-        // Extract modifiers from Place
-        if let Some(p) = place {
-            process_modifiers(&p.modifiers);
-        }
+        multipliers = 1.0;
+        bases = 0.0;
+        flats = 0.0;
 
-        let mut x = 0.0;
-        // Extract modifiers from Character's stat
+        // 2. Extract modifiers from Character's stat
         if let Some(c) = character {
             if let Some(c_stat) = c.stats.iter().find(|s| s.name == self.name) {
-                process_modifiers(&c_stat.modifiers);
-                x = c_stat.base_value.as_f64();
+                apply_modifiers(&c_stat.modifiers, &mut multipliers, &mut bases, &mut flats);
+                value = multipliers * (c_stat.base_value.as_f64() + bases) + flats;
+
+                multipliers = 1.0;
+                bases = 0.0;
+                flats = 0.0;
             }
         }
+        else { return Err("resolve_stat__character_not_found".into()) }
 
-        // Also include modifiers from the current Stat instance itself
-        process_modifiers(&self.modifiers);
+        // 3. Extract modifiers from Place
+        if let Some(p) = place {
+            apply_modifiers(&p.modifiers, &mut multipliers, &mut bases, &mut flats);
+            value = multipliers * (value + bases) + flats;
 
-        // Calculate final value: a*(x+b)+c
-        // a = multipliers, b = bases, c = flats, x = self.base_value
-        let result = multipliers * (x + bases) + flats;
+            multipliers = 1.0;
+            bases = 0.0;
+            flats = 0.0;
+        }
+
+        // 4. Extract modifiers from Universe stat
+        if let Some(u_stat) = universe_stat {
+            apply_modifiers(&u_stat.modifiers, &mut multipliers, &mut bases, &mut flats);
+            value = multipliers * (value + bases) + flats;
+        }
+
+        if let Some(max) = self.max { match max{
+            StatValue::I64(max) => {if (max as f64) < value {value = max as f64}}
+            StatValue::F64(max) => {if max < value {value = max}}
+            _ => {}
+        }}
+        if let Some(min) = self.min { match min{
+            StatValue::I64(min) => {if min as f64 > value {value = min as f64}}
+            StatValue::F64(min) => {if min > value {value = min}}
+            _ => {}
+        }}
 
         match self.base_value {
-            StatValue::I64(_) => Ok(StatValue::I64(result.round() as i64)),
-            _ => Ok(StatValue::F64(result)),
+            StatValue::I64(_) => Ok(StatValue::I64(value.round() as i64)),
+            _ => Ok(StatValue::F64(value)),
         }
     }
 }
