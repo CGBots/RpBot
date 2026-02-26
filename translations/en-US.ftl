@@ -434,3 +434,7 @@ create_character__invalid_interaction = Invalid interaction data.
 create_character__choose_place = Choose a place
     .title = Choose a place
     .message = Please select the category where the character will be located.
+character_stat_input = Character's statistics
+accept_character__no_player_role_id = Server not configured
+    .title = Server not configured
+    .message = The {player_role_name} role hasn't been found.

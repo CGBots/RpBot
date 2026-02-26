@@ -184,7 +184,7 @@ pub async fn partial_setup<'a>(ctx: &Context<'_>, server: &mut Server, snapshot:
 
     match res {
         Ok(_) => {}
-        Err(e) => {
+        Err(_) => {
             server.rollback(ctx, snapshot).await;
             return Err("setup__reorder_went_wrong".into())}
     }

@@ -1,7 +1,7 @@
 use futures::{TryStreamExt};
 use std::time::Duration;
 use std::sync::atomic::Ordering;
-use serenity::all::{ButtonStyle, Channel, Color, ComponentInteraction, CreateActionRow, CreateButton, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, CreateInputText, CreateInteractionResponse, CreateMessage, EditMessage, EmbedField, InputTextStyle, Mentionable, Permissions};
+use serenity::all::{ButtonStyle, Color, ComponentInteraction, CreateActionRow, CreateButton, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, CreateInputText, CreateInteractionResponse, CreateMessage, EditMember, EditMessage, EmbedField, InputTextStyle, Permissions};
 use crate::discord::poise_structs::{Context, Error};
 use crate::utility::reply::reply;
 use serenity::client::Context as SerenityContext;
@@ -29,6 +29,7 @@ pub static CHARACTER_SPECIAL_REQUEST: &str = "character_special_request";
 pub static CHARACTER_INSTRUCTION: &str = "character_instruction";
 pub static CHARACTER_REJECT_REASON: &str = "character_reject_reason";
 pub static ACCEPT_CHARACTER_CHOOSE_PLACE: &str = "create_character__choose_place";
+pub static CHARACTER_ACCEPT__STAT_INPUT: &str = "character_stat_input";
 
 /// Verifies that the interaction user owns the character in the message
 /// Verifies that the interaction user is the owner of the character described in the message.
@@ -107,7 +108,7 @@ pub async fn create_character(
 ) -> Result<(), Error> {
     let result = _create_character(ctx).await;
     if let Err(result) = result {
-        if let Err(result) = reply(ctx, Err(result)).await {return Err("reply__reply_failed".into())};
+        if let Err(_) = reply(ctx, Err(result)).await {return Err("reply__reply_failed".into())};
     };
     Ok(())
 }
@@ -161,7 +162,8 @@ pub async fn _create_character(ctx: Context<'_>) -> Result<&'static str, Error>{
     let modal = CreateQuickModal::new(tr!(ctx, CHARACTER_MODAL_TITLE))
         .field(
             CreateInputText::new(InputTextStyle::Short, tr!(ctx, CHARACTER_NAME), CHARACTER_NAME)
-                .required(true).min_length(3).max_length(64))
+                .required(true).min_length(3).max_length(32)
+        )
         .field(
             CreateInputText::new(InputTextStyle::Paragraph, tr!(ctx, CHARACTER_DESCRIPTION), CHARACTER_DESCRIPTION)
                 .required(true).max_length(1024)
@@ -175,7 +177,7 @@ pub async fn _create_character(ctx: Context<'_>) -> Result<&'static str, Error>{
             CreateInputText::new(InputTextStyle::Paragraph, tr!(ctx, CHARACTER_SPECIAL_REQUEST), CHARACTER_SPECIAL_REQUEST)
                 .required(false).max_length(1024)
         )
-        .timeout(Duration::from_secs(30));
+        .timeout(Duration::from_mins(30));
 
     let Ok(interaction) = app_ctx.interaction.quick_modal(ctx.serenity_context(), modal).await else { return Err("create_character__timed_out".into()) };
     app_ctx.has_sent_initial_response.store(true, Ordering::SeqCst);
@@ -287,7 +289,7 @@ pub async fn modify_character(ctx: SerenityContext, component_interaction: Compo
     let modal = CreateQuickModal::new(tr_locale!(component_interaction.locale.as_str(), CHARACTER_MODAL_TITLE))
         .field(
             CreateInputText::new(InputTextStyle::Short, tr_locale!(component_interaction.locale.as_str(), CHARACTER_NAME), CHARACTER_NAME)
-                .required(true).min_length(3).max_length(64)
+                .required(true).min_length(3).max_length(32)
                 .value(component_interaction.message.embeds[0].title.clone().unwrap().as_str())
         )
         .field(
@@ -305,7 +307,7 @@ pub async fn modify_character(ctx: SerenityContext, component_interaction: Compo
                 .required(false).max_length(1024)
                 .value(embed_fields[2].value.clone())
         )
-        .timeout(Duration::from_secs(30));
+        .timeout(Duration::from_mins(30));
 
     let Ok(interaction) = component_interaction.quick_modal(&ctx, modal).await else { return Err("create_character__timed_out".into()) };
     let modal_response = match interaction {
@@ -402,7 +404,7 @@ pub async fn refuse_character(ctx: SerenityContext, component_interaction: Compo
             CreateInputText::new(InputTextStyle::Paragraph, tr_locale!(component_interaction.locale.as_str(), CHARACTER_REJECT_REASON), CHARACTER_REJECT_REASON)
                 .required(false).max_length(864)
         )
-        .timeout(Duration::from_secs(30));
+        .timeout(Duration::from_mins(30));
 
     let Ok(interaction) = component_interaction.quick_modal(&ctx, modal).await else { return Err("create_character__timed_out".into()) };
     let modal_response = match interaction {
@@ -527,7 +529,7 @@ pub async fn accept_character(ctx: SerenityContext, component_interaction: Compo
     for stat in stats.clone() {
         text.push_str(&format!("{}: [{:?}]\n", stat.name, stat.base_value));
     };
-    quick_modal = quick_modal.field(CreateInputText::new(InputTextStyle::Paragraph, "test", "test").value(text).required(false));
+    quick_modal = quick_modal.field(CreateInputText::new(InputTextStyle::Paragraph, tr_locale!(component_interaction.locale.as_str(), CHARACTER_ACCEPT__STAT_INPUT) , "stats_input").value(text).required(false));
     let Ok(interaction) = component_interaction.quick_modal(&ctx, quick_modal).await else { return Err("create_character__timed_out".into()) };
 
     let mut extracted_stats: Vec<Stat> = Vec::new();
@@ -573,16 +575,17 @@ pub async fn accept_character(ctx: SerenityContext, component_interaction: Compo
         }
     }
 
-    // Extract user ID from embed footer
-    let Ok(character_user_id) = component_interaction.message.embeds[0]
+    let character_user_id = match component_interaction.message.embeds[0]
         .footer.as_ref()
-        .unwrap()
-        .text.parse::<u64>() else { return Err("create_character__invalid_footer".into()) };
+        .and_then(|f| f.text.parse::<u64>().ok()) {
+            Some(id) => id,
+            None => return Err("create_character__invalid_footer".into()),
+        };
 
-    let character_name = component_interaction.message.embeds[0]
-        .title.as_ref()
-        .unwrap()
-        .clone();
+    let character_name = match component_interaction.message.embeds[0].title.as_ref() {
+        Some(title) => title.clone(),
+        None => return Err("create_character__invalid_embed_title".into()),
+    };
 
     let embed_fields = &component_interaction.message.embeds[0].fields;
     let _description = embed_fields.iter()
@@ -610,13 +613,24 @@ pub async fn accept_character(ctx: SerenityContext, component_interaction: Compo
         stats: extracted_stats,
     };
 
-    let Ok(_) = character.update().await else { return Err("create_character__database_error".into()) };
+    let Ok(_) = character.clone().update().await else { return Err("create_character__database_error".into()) };
 
     if let Some(player_role_id) = server.player_role_id {
         if let Ok(member) = ctx.http().get_member(guild_id, character_user_id.into()).await {
             let _ = member.add_role(&ctx.http(), player_role_id.id).await;
         }
-    }
+    } else {return Err("accept_character__no_player_role_id".into())}
+
+    let _ = if let Ok(member) = ctx.http().get_member(guild_id, character_user_id.into()).await {
+        let nickname = if (character.clone().name.to_string() + "│" + member.user.display_name()).chars().count() > 32 {
+            character.clone().name.to_string()
+        } else { character.clone().name.to_string() + "│" + member.user.display_name() };
+        ctx.http().edit_member(
+            guild_id,
+            character_user_id.into(),
+            &EditMember::new().nickname(nickname),
+            None).await
+    } else { return Err("accept_character__member_not_found".into())};
 
     let message = component_interaction.message.clone();
     let original_embed: CreateEmbed = message.embeds[0].clone().into();

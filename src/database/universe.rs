@@ -528,7 +528,7 @@ impl Universe {
 
     pub async fn get_player_by_user_id(self, user_id: u64) -> mongodb::error::Result<Option<Character>> {
         let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }) .await .clone();
-        let filter = doc!{};
+        let filter = doc!{"user_id": user_id.to_string()};
         db_client
             .database(self.universe_id.to_string().as_str())
             .collection::<Character>(CHARACTER_COLLECTION_NAME)

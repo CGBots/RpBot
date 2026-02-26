@@ -349,28 +349,62 @@ impl Stat {
         let db = db_client.database(&self.universe_id.to_string());
 
         // 1. Recover stat in the universe (global)
-        let universe_stat = db.collection::<Stat>(STATS_COLLECTION_NAME)
+        let mut universe_stat = db.collection::<Stat>(STATS_COLLECTION_NAME)
             .find_one(doc! { "name": &self.name })
             .await.unwrap_or_else(|_| None);
 
         // 2. Recover location stat/modifiers
-        let place = db.collection::<Place>(PLACES_COLLECTION_NAME)
+        let mut place = db.collection::<Place>(PLACES_COLLECTION_NAME)
             .find_one(doc! { "category_id": category_id.to_string() })
             .await.unwrap_or_else(|_| None);
 
         // 3. Recover player stat/modifiers
-        let character = match db.collection::<Character>(CHARACTER_COLLECTION_NAME)
+        let mut character = match db.collection::<Character>(CHARACTER_COLLECTION_NAME)
             .find_one(doc! { "user_id": user_id.to_string() })
             .await {
                 Ok(res) => res,
                 Err(_) => return Err("resolve_stat__database_error".into())
             };
 
-        let mut multipliers = 1.0;
-        let mut bases = 0.0;
-        let mut flats = 0.0;
-
         let stat_id = self._id;
+
+        // Cleanup expired modifiers
+        if let Some(ref mut c) = character {
+            let mut changed = false;
+            for s in &mut c.stats {
+                let initial_len = s.modifiers.len();
+                s.modifiers.retain(|m| m.is_active());
+                if s.modifiers.len() != initial_len {
+                    changed = true;
+                }
+            }
+            if changed {
+                let _ = db.collection::<Character>(CHARACTER_COLLECTION_NAME)
+                    .replace_one(doc! { "_id": c._id }, c.clone())
+                    .await;
+            }
+        } else {return Err("resolve_stat__character_not_found".into())}
+
+        if let Some(ref mut p) = place {
+            let initial_len = p.modifiers.len();
+            p.modifiers.retain(|m| m.is_active());
+            if p.modifiers.len() != initial_len {
+                let _ = db.collection::<Place>(PLACES_COLLECTION_NAME)
+                    .replace_one(doc! { "_id": p._id }, p.clone())
+                    .await;
+            }
+        }
+
+        if let Some(ref mut u_stat) = universe_stat {
+            let initial_len = u_stat.modifiers.len();
+            u_stat.modifiers.retain(|m| m.is_active());
+            if u_stat.modifiers.len() != initial_len {
+                let _ = db.collection::<Stat>(STATS_COLLECTION_NAME)
+                    .replace_one(doc! { "_id": u_stat._id }, u_stat.clone())
+                    .await;
+            }
+        }
+
         let apply_modifiers = |modifiers: &[Modifier], multipliers: &mut f64, bases: &mut f64, flats: &mut f64| {
             for modifier in modifiers {
                 if modifier.stat == stat_id {
@@ -384,10 +418,9 @@ impl Stat {
         };
 
         let mut value = self.base_value.as_f64();
-
-        multipliers = 1.0;
-        bases = 0.0;
-        flats = 0.0;
+        let mut multipliers = 1.0;
+        let mut bases = 0.0;
+        let mut flats = 0.0;
 
         // 2. Extract modifiers from Character's stat
         if let Some(c) = character {

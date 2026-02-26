@@ -1,7 +1,6 @@
 use poise::CreateReply;
 use serenity::all::{Color, CreateEmbed, CreateEmbedFooter};
 use crate::discord::poise_structs::{Context, Error};
-use crate::translation::tr;
 
 /// Starts an administrator-only guild slash command.
 ///

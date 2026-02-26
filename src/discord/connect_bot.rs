@@ -96,7 +96,8 @@ pub async fn connect_bot() -> Result<Client, ()>{
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
-        | GatewayIntents::MESSAGE_CONTENT;
+        | GatewayIntents::MESSAGE_CONTENT
+        | GatewayIntents::GUILD_MEMBERS;
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {

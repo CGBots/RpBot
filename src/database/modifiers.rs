@@ -21,6 +21,15 @@ pub struct Modifier{
     pub source: ObjectId
 }
 
-impl Modifier{
-
+impl Modifier {
+    pub fn is_active(&self) -> bool {
+        if let Some(end) = self.end_timestamp {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs();
+            return now < end;
+        }
+        true
+    }
 }

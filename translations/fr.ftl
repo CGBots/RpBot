@@ -433,3 +433,7 @@ create_character__invalid_interaction = Données d'interaction invalides.
 create_character__choose_place = Choisir un lieu
     .title = Choisir un lieu
     .message = Veuillez sélectionner la catégorie où le personnage sera situé.
+character_stat_input = Statistiques du personnage
+accept_character__no_player_role_id = Serveur non setup
+    .title = Serveur non setup
+    .message = Le role {player_role_name} n'as pas été trouvé.
