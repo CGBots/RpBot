@@ -58,7 +58,7 @@ pub async fn reply<'a>(
 ) -> Result<&'a str, Error> {
     let (color, string) = match result {
         Ok(string) => (Color::from_rgb(0, 255, 0), string.to_string()),
-        Err(error) => (Color::from_rgb(255, 0, 0), error.to_string()),
+        Err(ref error) => (Color::from_rgb(255, 0, 0), error.to_string()),
     };
 
     match ctx.send(CreateReply::default().embed(
@@ -67,7 +67,7 @@ pub async fn reply<'a>(
                 .description(crate::translation::get(ctx, &string, Some("message"), None))
                 .footer(CreateEmbedFooter::new(string.clone()))
                 .color(color),
-        ),
+        ).ephemeral(result.is_err()),
     )
         .await {
         Ok(_) => {Ok("reply__reply_success")}
