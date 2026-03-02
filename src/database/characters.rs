@@ -1,11 +1,13 @@
+use mongodb::bson::doc;
 use serde_with::DisplayFromStr;
 use mongodb::bson::oid::ObjectId;
 use mongodb::results::InsertOneResult;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use crate::database::db_client::{connect_db, DB_CLIENT};
-use crate::database::db_namespace::{CHARACTER_COLLECTION_NAME};
+use crate::database::db_namespace::{CHARACTERS_COLLECTION_NAME, TRAVELS_COLLECTION_NAME};
 use crate::database::stats::Stat;
+use crate::database::travel::PlayerMove;
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -16,7 +18,7 @@ pub struct Character {
     pub user_id: u64,
     pub universe_id: ObjectId,
     pub name: String,
-    pub stats: Vec<Stat>
+    pub stats: Vec<Stat>,
 }
 
 impl Character {
@@ -24,8 +26,18 @@ impl Character {
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         db_client
             .database(self.universe_id.to_string().as_str())
-            .collection::<Character>(CHARACTER_COLLECTION_NAME)
+            .collection::<Character>(CHARACTERS_COLLECTION_NAME)
             .insert_one(self)
+            .await
+    }
+
+    pub async fn get_player_move(self) -> mongodb::error::Result<Option<PlayerMove>> {
+        let filter = doc!{"player_id": self._id};
+        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+        db_client
+            .database(self.universe_id.to_string().as_str())
+            .collection::<PlayerMove>(TRAVELS_COLLECTION_NAME)
+            .find_one(filter)
             .await
     }
 }

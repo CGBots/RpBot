@@ -1,6 +1,9 @@
+use std::str::FromStr;
 use futures::{TryStreamExt};
 use std::time::Duration;
 use std::sync::atomic::Ordering;
+use mongodb::bson::doc;
+use mongodb::bson::oid::ObjectId;
 use serenity::all::{ButtonStyle, Color, ComponentInteraction, CreateActionRow, CreateButton, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, CreateInputText, CreateInteractionResponse, CreateMessage, EditMember, EditMessage, EmbedField, InputTextStyle, Permissions};
 use crate::discord::poise_structs::{Context, Error};
 use crate::utility::reply::reply;
@@ -10,9 +13,12 @@ use serenity::utils::CreateQuickModal;
 use crate::database::server::{get_server_by_id, Server};
 use crate::{tr, tr_locale};
 use crate::database::characters::Character;
+use crate::database::db_namespace::{CHARACTERS_COLLECTION_NAME, TRAVELS_COLLECTION_NAME};
 use crate::database::places::{Place};
 use crate::database::stats::{Stat, StatValue};
+use crate::database::travel::{PlayerMove, SpaceType};
 use crate::database::universe::get_universe_by_id;
+use crate::universe::universe;
 
 pub static CHARACTER_MODAL_TITLE: &str = "character_modal_title";
 pub static MODIFY_CHARACTER_BUTTON_CUSTOM_ID: &str = "create_character__modify_character";
@@ -518,9 +524,9 @@ pub async fn accept_character(ctx: SerenityContext, component_interaction: Compo
         return Err("create_character__no_permission".into());
     }
 
-    let Ok(universe) = get_universe_by_id(server.universe_id.to_string()).await else { return Err("create_character__database_error".into()) };
+    let Ok(universe) = get_universe_by_id(ObjectId::from_str(server.universe_id.to_string().as_str())?).await else { return Err("create_character__database_error".into()) };
     let Ok(universe) = universe.ok_or("create_character__no_universe_found") else { return Err("create_character__no_universe_found".into()) };
-    let Ok(stats_cursor) = universe.get_stats().await else { return Err("create_character__database_error".into()) };
+    let Ok(stats_cursor) = universe.clone().get_stats().await else { return Err("create_character__database_error".into()) };
     let Ok(stats) = stats_cursor.try_collect::<Vec<Stat>>().await else { return Err("create_character__database_error".into()) };
 
     // Prepare the stat template for the modal
@@ -613,7 +619,7 @@ pub async fn accept_character(ctx: SerenityContext, component_interaction: Compo
         stats: extracted_stats,
     };
 
-    let Ok(_) = character.clone().update().await else { return Err("create_character__database_error".into()) };
+    let Ok(character_result) = character.clone().update().await else { return Err("create_character__database_error".into()) };
 
     if let Some(player_role_id) = server.player_role_id {
         if let Ok(member) = ctx.http().get_member(guild_id, character_user_id.into()).await {
@@ -723,6 +729,39 @@ pub async fn choose_character_place(ctx: SerenityContext, component_interaction:
             let _ = member.remove_role(&ctx.http(), spectator_role_id.id).await;
         }
     }
+
+    let player_id = component_interaction.message.embeds.get(0).unwrap();
+    let player_id = player_id.footer.clone().unwrap();
+    let player_id = player_id.text.as_str();
+    let character_filter = doc!{"user_id": player_id};
+
+    let Ok(Some(character)) = db_client.database(place.universe_id.to_string().as_str()).collection::<Character>(CHARACTERS_COLLECTION_NAME)
+        .find_one(character_filter).await else {return Err("create_character__database_error".into())};
+
+    let player_move = PlayerMove{
+        _id: Default::default(),
+        universe_id: server.universe_id,
+        server_id: server.server_id,
+        actual_space_id: place.category_id,
+        actual_space_type: Default::default(),
+        is_in_move: false,
+        is_end: false,
+        step_start_timestamp: None,
+        step_end_timestamp: None,
+        road_role_id: None,
+        road_id: None,
+        destination_id: None,
+        destination_role_id: None,
+        source_id: Some(place.category_id),
+        source_role_id: Some(place.role),
+        modified_speed: 0.0,
+        distance_traveled: 0.0,
+        user_id: character_user_id,
+    };
+
+    // Supprime l'ancien mouvement s'il existe dans un autre univers
+    let _ = player_move.remove().await;
+    let Ok(_) = player_move.upsert().await else {return Err("create_character__database_error".into())};
 
     let original_embed: CreateEmbed = component_interaction.message.embeds[0].clone().into();
     let _ = component_interaction.channel_id.edit_message(

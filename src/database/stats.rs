@@ -42,10 +42,11 @@ use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use crate::database::db_client::{connect_db, DB_CLIENT};
-use crate::database::db_namespace::{CHARACTER_COLLECTION_NAME, PLACES_COLLECTION_NAME, STATS_COLLECTION_NAME};
+use crate::database::db_namespace::{CHARACTERS_COLLECTION_NAME, PLACES_COLLECTION_NAME, ROADS_COLLECTION_NAME, STATS_COLLECTION_NAME};
 use crate::database::modifiers::{Modifier, ModifierType};
 use crate::database::characters::Character;
 use crate::database::places::Place;
+use crate::database::road::Road;
 use crate::discord::poise_structs::Error;
 
 pub static SPEED_STAT: &str = "speed";
@@ -344,7 +345,7 @@ impl Stat {
         true
     }
 
-    pub async fn resolve(self, category_id: u64, user_id: u64) -> Result<StatValue, Error> {
+    pub async fn resolve(self, category_id: u64, user_id: u64) -> Result<(StatValue, Option<Modifier>), Error> {
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         let db = db_client.database(&self.universe_id.to_string());
 
@@ -354,12 +355,16 @@ impl Stat {
             .await.unwrap_or_else(|_| None);
 
         // 2. Recover location stat/modifiers
-        let mut place = db.collection::<Place>(PLACES_COLLECTION_NAME)
-            .find_one(doc! { "category_id": category_id.to_string() })
+        let mut road = db.collection::<Road>(ROADS_COLLECTION_NAME)
+            .find_one(doc! { "$or": [
+                { "channel_id": category_id.to_string() },
+                { "place_one_id": category_id.to_string() },
+                { "place_two_id": category_id.to_string() }
+            ] })
             .await.unwrap_or_else(|_| None);
 
         // 3. Recover player stat/modifiers
-        let mut character = match db.collection::<Character>(CHARACTER_COLLECTION_NAME)
+        let mut character = match db.collection::<Character>(CHARACTERS_COLLECTION_NAME)
             .find_one(doc! { "user_id": user_id.to_string() })
             .await {
                 Ok(res) => res,
@@ -368,44 +373,51 @@ impl Stat {
 
         let stat_id = self._id;
 
+
+
         // Cleanup expired modifiers
-        if let Some(ref mut c) = character {
+        if let Some(ref mut _character) = character {
             let mut changed = false;
-            for s in &mut c.stats {
-                let initial_len = s.modifiers.len();
-                s.modifiers.retain(|m| m.is_active());
-                if s.modifiers.len() != initial_len {
+            for stat in &mut _character.stats {
+                let initial_len = stat.modifiers.len();
+                stat.modifiers.retain(|m| m.is_active());
+                if stat.modifiers.len() != initial_len {
                     changed = true;
                 }
             }
             if changed {
-                let _ = db.collection::<Character>(CHARACTER_COLLECTION_NAME)
-                    .replace_one(doc! { "_id": c._id }, c.clone())
+                let _ = db.collection::<Character>(CHARACTERS_COLLECTION_NAME)
+                    .replace_one(doc! { "_id": _character._id }, _character.clone())
                     .await;
             }
         } else {return Err("resolve_stat__character_not_found".into())}
 
-        if let Some(ref mut p) = place {
-            let initial_len = p.modifiers.len();
-            p.modifiers.retain(|m| m.is_active());
-            if p.modifiers.len() != initial_len {
-                let _ = db.collection::<Place>(PLACES_COLLECTION_NAME)
-                    .replace_one(doc! { "_id": p._id }, p.clone())
+        if let Some(ref mut road) = road {
+            let initial_len = road.modifiers.len();
+            road.modifiers.retain(|m| m.is_active());
+            if road.modifiers.len() != initial_len {
+                let _ = db.collection::<Road>(ROADS_COLLECTION_NAME)
+                    .replace_one(doc! { "_id": road._id }, road.clone())
                     .await;
             }
         }
 
-        if let Some(ref mut u_stat) = universe_stat {
-            let initial_len = u_stat.modifiers.len();
-            u_stat.modifiers.retain(|m| m.is_active());
-            if u_stat.modifiers.len() != initial_len {
+        if let Some(ref mut _universe_stat) = universe_stat {
+            let initial_len = _universe_stat.modifiers.len();
+            _universe_stat.modifiers.retain(|m| m.is_active());
+            if _universe_stat.modifiers.len() != initial_len {
                 let _ = db.collection::<Stat>(STATS_COLLECTION_NAME)
-                    .replace_one(doc! { "_id": u_stat._id }, u_stat.clone())
+                    .replace_one(doc! { "_id": _universe_stat._id }, _universe_stat.clone())
                     .await;
             }
         }
 
-        let apply_modifiers = |modifiers: &[Modifier], multipliers: &mut f64, bases: &mut f64, flats: &mut f64| {
+
+
+        let mut grouped_modifiers: Vec<Modifier> = vec![];
+
+        let mut apply_modifiers = |modifiers: &Vec<Modifier>, multipliers: &mut f64, bases: &mut f64, flats: &mut f64| {
+            grouped_modifiers.append(modifiers.clone().as_mut());
             for modifier in modifiers {
                 if modifier.stat == stat_id {
                     match modifier.modifier_type {
@@ -422,9 +434,10 @@ impl Stat {
         let mut bases = 0.0;
         let mut flats = 0.0;
 
+
         // 2. Extract modifiers from Character's stat
-        if let Some(c) = character {
-            if let Some(c_stat) = c.stats.iter().find(|s| s.name == self.name) {
+        if let Some(_character) = character {
+            if let Some(c_stat) = _character.stats.iter().find(|s| s.name == self.name) {
                 apply_modifiers(&c_stat.modifiers, &mut multipliers, &mut bases, &mut flats);
                 value = multipliers * (c_stat.base_value.as_f64() + bases) + flats;
 
@@ -436,8 +449,8 @@ impl Stat {
         else { return Err("resolve_stat__character_not_found".into()) }
 
         // 3. Extract modifiers from Place
-        if let Some(p) = place {
-            apply_modifiers(&p.modifiers, &mut multipliers, &mut bases, &mut flats);
+        if let Some(_place) = road {
+            apply_modifiers(&_place.modifiers, &mut multipliers, &mut bases, &mut flats);
             value = multipliers * (value + bases) + flats;
 
             multipliers = 1.0;
@@ -462,9 +475,19 @@ impl Stat {
             _ => {}
         }}
 
+        let shortest_modifier_end_timestamp = grouped_modifiers.clone().into_iter().min_by_key(|modifier| modifier.end_timestamp);
+
         match self.base_value {
-            StatValue::I64(_) => Ok(StatValue::I64(value.round() as i64)),
-            _ => Ok(StatValue::F64(value)),
+            StatValue::I64(_) => Ok((StatValue::I64(value.round() as i64), shortest_modifier_end_timestamp)),
+            _ => Ok((StatValue::F64(value), shortest_modifier_end_timestamp)),
         }
     }
+}
+
+pub async fn get_stat_by_name(universe_id: ObjectId, name: &str) -> mongodb::error::Result<Option<Stat>> {
+    let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+    let db = db_client.database(universe_id.to_string().as_str());
+    db.collection::<Stat>(STATS_COLLECTION_NAME)
+        .find_one(doc! { "name": name })
+        .await
 }

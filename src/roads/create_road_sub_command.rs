@@ -14,10 +14,11 @@ pub async fn create_road(
     place_one: GuildChannel,
     #[channel_types("Category")]
     place_two: GuildChannel,
-    distance: u64
+    distance: u64,
+    secret_channel: Option<bool>
 ) -> Result<(), Error> {
     let Ok(_) = ctx.defer().await else { return Err("reply__reply_failed".into()) };
-    let result = _create_road(&ctx, place_one, place_two, distance).await;
+    let result = _create_road(&ctx, place_one, place_two, distance, secret_channel).await;
     let Ok(_) = reply(ctx.clone(), result).await else { return Err("reply__reply_failed".into()) };
     Ok(())
 }
@@ -69,7 +70,7 @@ pub async fn create_road(
 ///      Err(error_message) => eprintln!("Failed to create road: {}", error_message),
 ///  }
 ///  ```
-pub async fn _create_road(ctx: &Context<'_>, place_one : GuildChannel, place_two: GuildChannel, distance: u64) -> Result<&'static str, Error>{
+pub async fn _create_road(ctx: &Context<'_>, place_one : GuildChannel, place_two: GuildChannel, distance: u64, secret_channel: Option<bool>) -> Result<&'static str, Error>{
     let guild_id = ctx.guild_id().unwrap();
 
     let server = get_server_by_id(guild_id.get()).await;
@@ -107,6 +108,10 @@ pub async fn _create_road(ctx: &Context<'_>, place_one : GuildChannel, place_two
         }
         Err(_) => {return Err("create_road__database_error".into())}
     };
+
+    if let Ok(Some(_)) = server.get_road(place_one.category_id, place_two.category_id).await {
+        return Err("create_road__already_exists".into());
+    }
 
     let name = place_one.name + "-" + place_two.name.as_str();
 
@@ -148,6 +153,8 @@ pub async fn _create_road(ctx: &Context<'_>, place_one : GuildChannel, place_two
         }
     };
 
+    let secret_channel_value = if secret_channel.is_some() {secret_channel.unwrap()} else {false};
+
     let road = Road{
         _id: ObjectId::default(),
         universe_id: server.universe_id,
@@ -157,6 +164,7 @@ pub async fn _create_road(ctx: &Context<'_>, place_one : GuildChannel, place_two
         place_one_id: place_one.category_id,
         place_two_id: place_two.category_id,
         distance,
+        secret: secret_channel_value,
         modifiers: vec![]
     };
 

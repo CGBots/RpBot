@@ -1,3 +1,5 @@
+use std::str::FromStr;
+use mongodb::bson::oid::ObjectId;
 use crate::discord::poise_structs::{Context, Error};
 use crate::tr;
 use crate::database::universe::{get_universe_by_id, get_universe_by_server_id, Universe};
@@ -62,7 +64,7 @@ pub async fn _add_server(ctx: &Context<'_>, setup_type: SetupType) -> Result<&'s
             if let Some(selected) = values.get(0) {
                 let _ = message.delete(*ctx).await;
 
-                let Ok(universe_opt) = get_universe_by_id(selected.to_string()).await else { return Err("create_character__database_error".into()) };
+                let Ok(universe_opt) = get_universe_by_id(ObjectId::from_str(selected.as_str())?).await else { return Err("create_character__database_error".into()) };
                 let Some(universe) = universe_opt else {return Err("create_character__no_universe_found".into())};
 
                 let Ok(res) = universe.clone().check_server_limit().await else { return Err("universe__check_server_limit_failed".into()) };

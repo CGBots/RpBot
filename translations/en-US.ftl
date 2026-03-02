@@ -1,3 +1,5 @@
+botname = VerseEngine
+
 placeholder = Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla eget neque arcu. Integer sed turpis.
     .title = Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla eget neque arcu. Integer sed turpis.
     .message = Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla eget neque arcu. Integer sed turpis.
@@ -11,7 +13,7 @@ start = start
     .description = Displays startup instructions in the current channel.
 
 start_message = Start Message
-    .title = Thank you for using
+    .title = Thank you for using {botname}
     .description = To start using the bot, begin by creating a new universe.
             Use the command `/{universe} {create_universe} [your universe name] [setup type]`
             The setup type determines which channels will be created.
@@ -304,6 +306,8 @@ create_road = create_road
     .place_two-description = Second end of the road
     .distance = distance
     .distance-description = Distance between the two places in Km.
+    .secret = secret
+    .secret-description = Hide the road on maps (future functionnality) and wiki.
 create_road__server_not_found = Server not found
     .title = Server not found
     .message = The server does not appear to be registered. Run /{$universe} {$add_server} [setup type]
@@ -438,3 +442,34 @@ character_stat_input = Character's statistics
 accept_character__no_player_role_id = Server not configured
     .title = Server not configured
     .message = The {player_role_name} role hasn't been found.
+
+#Travels
+travel = travel
+    .description = Command to move from one place to another.
+    .destination = destination
+    .destination-description = The destination location (role associated with the place)
+travel__server_not_found = Server not found
+    .title = Server not found
+    .message = The server does not appear to be registered.
+travel__place_not_found = Place not found
+    .title = Place not found
+    .message = The specified destination place does not exist in this universe.
+travel__character_not_found = Character not found
+    .title = Character not found
+    .message = You do not have a character in this universe.
+travel__started = Travel started
+    .title = Travel started
+    .message = You have started your journey to {$destination}.
+travel__already_moving_to_destination = Already on the way
+    .title = Already on the way
+    .message = You are already moving toward this destination.
+travel__invalid_road_destination = Invalid destination
+    .title = Invalid destination
+    .message = You cannot go to this location from your current position on the road.
+move_from_place__road_not_found = No road found
+    .title = No road found
+    .message = There is no direct road between your current position and {$destination}.
+
+travel__moving_to_place = **_{$user} is moving toward {$destination}._**
+travel__reached_destination = **_{$user} has reached {$destination}._**
+travel__arrived_at_destination = **_{$user} has arrived at the destination._**

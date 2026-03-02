@@ -2,6 +2,7 @@ use log::log;
 use serenity::all::{Color, CreateEmbed, CreateEmbedFooter};
 use crate::discord::poise_structs::{Context, Error};
 use poise::CreateReply;
+use fluent::FluentArgs;
 
 /// Sends an embed-based reply to a user based on the result provided, with appropriate styling
 /// (green for success and red for failure) and localized content.
@@ -56,6 +57,14 @@ pub async fn reply<'a>(
     ctx: Context<'a>,
     result: Result<&'a str, Error>,
 ) -> Result<&'a str, Error> {
+    reply_with_args(ctx, result, None).await
+}
+
+pub async fn reply_with_args<'a>(
+    ctx: Context<'a>,
+    result: Result<&'a str, Error>,
+    args: Option<FluentArgs<'a>>,
+) -> Result<&'a str, Error> {
     let (color, string) = match result {
         Ok(string) => (Color::from_rgb(0, 255, 0), string.to_string()),
         Err(ref error) => (Color::from_rgb(255, 0, 0), error.to_string()),
@@ -63,8 +72,8 @@ pub async fn reply<'a>(
 
     match ctx.send(CreateReply::default().embed(
             CreateEmbed::new()
-                .title(crate::translation::get(ctx, &string, Some("title"), None))
-                .description(crate::translation::get(ctx, &string, Some("message"), None))
+                .title(crate::translation::get(ctx, &string, Some("title"), args.as_ref()))
+                .description(crate::translation::get(ctx, &string, Some("message"), args.as_ref()))
                 .footer(CreateEmbedFooter::new(string.clone()))
                 .color(color),
         ).ephemeral(result.is_err()),

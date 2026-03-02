@@ -1,7 +1,7 @@
 use futures::TryStreamExt;
 use crate::database::db_client::{DB_CLIENT, connect_db};
-use crate::database::db_namespace::{CHARACTER_COLLECTION_NAME, RPBOT_DB_NAME, SERVER_COLLECTION_NAME, STATS_COLLECTION_NAME, UNIVERSE_COLLECTION_NAME};
-use mongodb::bson::{doc, from_document};
+use crate::database::db_namespace::{CHARACTERS_COLLECTION_NAME, TRAVELS_COLLECTION_NAME, VERSEENGINE_DB_NAME, SERVERS_COLLECTION_NAME, STATS_COLLECTION_NAME, UNIVERSES_COLLECTION_NAME};
+use mongodb::bson::{doc, from_document, Document};
 use mongodb::bson::oid::ObjectId;
 use mongodb::{Cursor, IndexModel};
 use mongodb::options::{IndexOptions};
@@ -12,6 +12,7 @@ use tokio::join;
 use crate::database::characters::Character;
 use crate::database::server::{Server};
 use crate::database::stats::Stat;
+use crate::database::travel::PlayerMove;
 use crate::discord::poise_structs::Error;
 
 pub static FREE_LIMIT_UNIVERSE: usize = 2;
@@ -100,8 +101,8 @@ impl Universe {
     pub async fn insert_universe(&self) -> mongodb::error::Result<InsertOneResult> {
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         db_client
-            .database(RPBOT_DB_NAME)
-            .collection::<Universe>(UNIVERSE_COLLECTION_NAME)
+            .database(VERSEENGINE_DB_NAME)
+            .collection::<Universe>(UNIVERSES_COLLECTION_NAME)
             .insert_one(self)
             .await
     }
@@ -149,8 +150,8 @@ impl Universe {
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         let filter = doc! { "creator_id": user_id.to_string() };
         db_client
-            .database(RPBOT_DB_NAME)
-            .collection::<Universe>(UNIVERSE_COLLECTION_NAME)
+            .database(VERSEENGINE_DB_NAME)
+            .collection::<Universe>(UNIVERSES_COLLECTION_NAME)
             .find(filter)
             .await
             .unwrap().try_collect().await.unwrap()
@@ -202,8 +203,8 @@ impl Universe {
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         let filter = doc! { "creator_id": user_id.to_string() };
         let result  = db_client
-            .database(RPBOT_DB_NAME)
-            .collection::<Universe>(UNIVERSE_COLLECTION_NAME)
+            .database(VERSEENGINE_DB_NAME)
+            .collection::<Universe>(UNIVERSES_COLLECTION_NAME)
             .count_documents(filter)
             .await?;
 
@@ -255,8 +256,8 @@ impl Universe {
         let serv = server.universe_id(self.universe_id);
 
         db_client
-            .database(RPBOT_DB_NAME)
-            .collection::<Server>(SERVER_COLLECTION_NAME)
+            .database(VERSEENGINE_DB_NAME)
+            .collection::<Server>(SERVERS_COLLECTION_NAME)
             .insert_one(serv)
             .await
     }
@@ -394,12 +395,12 @@ impl Universe {
             .database(self.universe_id.to_string().as_str());
 
         let delete_universe = db_client
-            .database(RPBOT_DB_NAME)
-            .collection::<Universe>(UNIVERSE_COLLECTION_NAME);
+            .database(VERSEENGINE_DB_NAME)
+            .collection::<Universe>(UNIVERSES_COLLECTION_NAME);
 
         let delete_servers = db_client
-            .database(RPBOT_DB_NAME)
-            .collection::<Server>(SERVER_COLLECTION_NAME)
+            .database(VERSEENGINE_DB_NAME)
+            .collection::<Server>(SERVERS_COLLECTION_NAME)
             ;
 
         let (db_drop_result, universe_delete, server_delete) = join!(drop_db.drop(), delete_universe.delete_one(filter_universe), delete_servers.delete_one(filter_server));
@@ -499,8 +500,8 @@ impl Universe {
         let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }) .await .clone();
         let filter = doc!{"universe_id": self.universe_id};
         let servers_result_request = db_client
-            .database(RPBOT_DB_NAME)
-            .collection::<Server>(SERVER_COLLECTION_NAME)
+            .database(VERSEENGINE_DB_NAME)
+            .collection::<Server>(SERVERS_COLLECTION_NAME)
             .count_documents(filter)
             .await;
 
@@ -531,7 +532,7 @@ impl Universe {
         let filter = doc!{"user_id": user_id.to_string()};
         db_client
             .database(self.universe_id.to_string().as_str())
-            .collection::<Character>(CHARACTER_COLLECTION_NAME)
+            .collection::<Character>(CHARACTERS_COLLECTION_NAME)
             .find_one(filter)
             .await
     }
@@ -544,6 +545,22 @@ impl Universe {
             Err(e) => { Err(e) }
         }
     }
+
+    pub async fn get_all_universes() -> mongodb::error::Result<Vec<Universe>> {
+        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+        let mut cursor = db_client
+            .database(VERSEENGINE_DB_NAME)
+            .collection::<Universe>(UNIVERSES_COLLECTION_NAME)
+            .find(doc!{})
+            .await?;
+
+        let mut universes = Vec::new();
+        while let Some(universe) = cursor.try_next().await? {
+            universes.push(universe);
+        }
+        Ok(universes)
+    }
+
 }
 
 /// Asynchronously retrieves a `Universe` document from the database by its unique identifier.
@@ -595,14 +612,13 @@ impl Universe {
 /// * Ensure that `connect_db()`, `RPBOT_DB_NAME`, and `UNIVERSE_COLLECTION_NAME` are properly configured.
 /// * The database client and collections should match the expected schema for the `Universe` struct.
 pub async fn get_universe_by_id(
-    universe_id: String,
+    universe_id: ObjectId,
 ) -> mongodb::error::Result<Option<Universe>> {
     let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
-    let object_id = ObjectId::parse_str(&universe_id).map_err(|e| println!("{}", e));
-    let filter = doc! { "_id": object_id.unwrap() };
+    let filter = doc! { "_id": universe_id};
     db_client
-        .database(RPBOT_DB_NAME)
-        .collection::<Universe>(UNIVERSE_COLLECTION_NAME)
+        .database(VERSEENGINE_DB_NAME)
+        .collection::<Universe>(UNIVERSES_COLLECTION_NAME)
         .find_one(filter)
         .await
 }
@@ -669,7 +685,7 @@ pub async fn get_universe_by_server_id(
     let pipeline = vec![
         doc! { "$match": { "server_id": server_id.to_string() } },
         doc! { "$lookup": {
-            "from": UNIVERSE_COLLECTION_NAME,   // the UNIVERSE collection
+            "from": UNIVERSES_COLLECTION_NAME,   // the UNIVERSE collection
             "localField": "universe_id",        // field in SERVER
             "foreignField": "_id",              // field in UNIVERSE
             "as": "universe"
@@ -678,8 +694,8 @@ pub async fn get_universe_by_server_id(
     ];
 
     let mut cursor = db_client
-        .database(RPBOT_DB_NAME)
-        .collection::<Server>(SERVER_COLLECTION_NAME)
+        .database(VERSEENGINE_DB_NAME)
+        .collection::<Server>(SERVERS_COLLECTION_NAME)
         .aggregate(pipeline)
         .await?;
 
@@ -693,11 +709,10 @@ pub async fn get_universe_by_server_id(
 
     Ok(None)
 }
-
 #[cfg(test)]
 mod test {
     use crate::database::db_client::{connect_db, DB_CLIENT};
-    use crate::database::db_namespace::{RPBOT_DB_NAME, UNIVERSE_COLLECTION_NAME};
+    use crate::database::db_namespace::{VERSEENGINE_DB_NAME, UNIVERSES_COLLECTION_NAME};
     use crate::database::universe::{get_universe_by_id, get_universe_by_server_id, Universe};
     use mongodb::bson::doc;
     use mongodb::results::{DeleteResult, InsertOneResult};
@@ -730,8 +745,8 @@ mod test {
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         let filter = doc! { "server_ids": {"$in": [SERVER_ID.to_string()] } };
         db_client
-            .database(RPBOT_DB_NAME)
-            .collection::<Universe>(UNIVERSE_COLLECTION_NAME)
+            .database(VERSEENGINE_DB_NAME)
+            .collection::<Universe>(UNIVERSES_COLLECTION_NAME)
             .delete_many(filter)
             .await
             .unwrap()

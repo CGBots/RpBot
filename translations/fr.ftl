@@ -1,3 +1,5 @@
+botname = VerseEngine
+
 placeholder = Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla eget neque arcu. Integer sed turpis.
     .title = Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla eget neque arcu. Integer sed turpis.
     .message = Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla eget neque arcu. Integer sed turpis.
@@ -10,7 +12,7 @@ ping = ping
 start = start
     .description = Affiche les instruction de démarrage dans le salon actuel.
 start_message = Start Message
-    .title = Merci d'utiliser
+    .title = Merci d'utiliser {botname}
     .description = Pour commencer à utiliser le bot, commencez par créer un nouvel univers.
     Utilisez la commande `/{universe} {create_universe} [nom de votre univers] [type de setup]`
     Le type de setup détermine quels salons seront créés.
@@ -303,6 +305,8 @@ create_road = nouvelle_route
     .place_two-description = Seconde extrémité de la route
     .distance = distance
     .distance-description = Distance séparant les deux lieux en Km.
+    .secret = secret
+    .secret-description = Permet de cacher la route des cartes (fonctionnalité à venir) et du wiki.
 create_road__server_not_found = Serveur introuvable
     .title = Serveur introuvable
     .message = Le serveur ne semble pas être enregistré. Faites /{$universe} {$add_server} [type de setup]
@@ -345,6 +349,9 @@ create_road__insert_road_failed_rollback_role_failed = Erreur critique
 create_road__success = Route créée
     .title = Route créée
     .message = La route a été créée avec succès
+create_road__already_exists = Route déjà existante
+    .title = Route existante
+    .message = Une route existe déjà entre ces deux lieux.
 
 #Create character
 create_character = nouveau_personnage
@@ -437,3 +444,35 @@ character_stat_input = Statistiques du personnage
 accept_character__no_player_role_id = Serveur non setup
     .title = Serveur non setup
     .message = Le role {player_role_name} n'as pas été trouvé.
+
+
+#Travels
+travel = voyage
+    .description = Commande pour se déplacer d'un lieu à un autre.
+    .destination = destination
+    .destination-description = Le lieu de destination (rôle associé au lieu)
+travel__server_not_found = Serveur introuvable
+    .title = Serveur introuvable
+    .message = Le serveur ne semble pas être enregistré.
+travel__place_not_found = Lieu introuvable
+    .title = Lieu introuvable
+    .message = Le lieu de destination spécifié n'existe pas dans cet univers.
+travel__character_not_found = Personnage introuvable
+    .title = Personnage introuvable
+    .message = Vous n'avez pas de personnage dans cet univers.
+travel__started = Voyage commencé
+    .title = Voyage commencé
+    .message = Vous avez commencé votre voyage vers {$destination}.
+travel__already_moving_to_destination = Déjà en route
+    .title = Déjà en route
+    .message = Vous êtes déjà en train de vous déplacer vers cette destination.
+travel__invalid_road_destination = Destination invalide
+    .title = Destination invalide
+    .message = Vous ne pouvez pas aller à cet endroit depuis votre position actuelle sur la route.
+move_from_place__road_not_found = Aucune route trouvée
+    .title = Aucune route trouvée
+    .message = Il n'y a pas de route directe entre votre position actuelle et {$destination}.
+
+travel__moving_to_place = **_{$user} se déplace vers {$destination}._**
+travel__reached_destination = **_{$user} est arrivé à {$destination}._**
+travel__arrived_at_destination = **_{$user} viens d'arriver._**

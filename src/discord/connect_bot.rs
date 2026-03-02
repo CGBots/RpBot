@@ -19,6 +19,7 @@ use crate::ping_command::handler::ping;
 use crate::start_command::handler::start;
 use crate::discord::poise_structs::Data;
 use crate::universe::universe;
+use crate::travel::travel__sub_command::travel;
 
 #[cfg(not(test))]
 static SHARD_NUMBER: u32 = 1;
@@ -87,7 +88,7 @@ pub async fn connect_bot() -> Result<Client, ()>{
     tracing_subscriber::fmt::init();
     
     
-    let mut commands= vec![ping(), universe(), start(), place(), road(), character()];
+    let mut commands= vec![ping(), universe(), start(), place(), road(), character(), travel()];
     
     
     let translations = translation::read_ftl().expect("failed to read translation files");
@@ -148,6 +149,13 @@ pub async fn connect_bot() -> Result<Client, ()>{
                 .await
                 .expect("Err creating client");
         
+        {
+            let mut http_client = crate::travel::logic::HTTP_CLIENT.lock().await;
+            *http_client = Some(client.http.clone());
+        }
+
+        let _ = crate::travel::logic::setup().await;
+
         if let Err(why) = client.start_shards(SHARD_NUMBER).await {
             println!("Client error: {why:?}");
         }

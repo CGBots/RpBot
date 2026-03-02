@@ -5,7 +5,7 @@ use mongodb::IndexModel;
 use mongodb::options::IndexOptions;
 use tokio::sync::OnceCell;
 use urlencoding::encode;
-use crate::database::db_namespace::{RPBOT_DB_NAME, SERVER_COLLECTION_NAME};
+use crate::database::db_namespace::{VERSEENGINE_DB_NAME, SERVERS_COLLECTION_NAME};
 use crate::database::server::Server;
 
 /// Establishes an asynchronous connection to a MongoDB database.
@@ -106,8 +106,8 @@ pub async fn constraint(){
         .options(index_options)
         .build();
     let result_server_index = db_client
-        .database(RPBOT_DB_NAME)
-        .collection::<Server>(SERVER_COLLECTION_NAME)
+        .database(VERSEENGINE_DB_NAME)
+        .collection::<Server>(SERVERS_COLLECTION_NAME)
         .create_index(index_model)
         .await;
 }

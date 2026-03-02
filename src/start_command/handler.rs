@@ -34,7 +34,7 @@ pub async fn start(ctx: Context<'_>) -> Result<(), Error> {
     let _ = ctx.send(
         CreateReply::default().embed(
             CreateEmbed::new()
-                .title(crate::translation::get(ctx, "start_message", Some("title"), None) + " VerseEngine")
+                .title(crate::translation::get(ctx, "start_message", Some("title"), None))
                 .description(crate::translation::get(ctx, "start_message", Some("description"), None))
                 .footer(CreateEmbedFooter::new("start_message"))
                 .color(Color::from_rgb(0x6f, 0x00, 0xff))
