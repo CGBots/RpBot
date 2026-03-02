@@ -1,4 +1,4 @@
-pub static VERSEENGINE_DB_NAME: &str = "RpBot";
+pub static VERSEENGINE_DB_NAME: &str = "VerseEngine";
 pub static UNIVERSES_COLLECTION_NAME: &str = "universes";
 pub static SERVERS_COLLECTION_NAME: &str = "servers";
 pub static PLACES_COLLECTION_NAME: &str = "places";

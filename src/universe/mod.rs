@@ -1,11 +1,14 @@
 pub mod create_universe_sub_command;
 pub mod add_server_sub_command;
 pub mod setup;
+pub mod time;
+pub mod time_sub_command;
 
 use crate::universe::setup::setup_sub_command::setup;
 use crate::universe::add_server_sub_command::add_server;
 use crate::discord::poise_structs::{Context, Error};
 use crate::universe::create_universe_sub_command::create_universe;
+use crate::universe::time_sub_command::time;
 
 /// Handles the `/universe` slash command with multiple subcommands.
 ///
@@ -17,6 +20,7 @@ use crate::universe::create_universe_sub_command::create_universe;
 /// - **create_universe**: Command to create a new universe.
 /// - **add_server**: Command to add a server to an existing universe.
 /// - **setup**: Command to configure or set up the universe.
+/// - **time**: Display current universe time.
 ///
 /// ### Parameters:
 /// - `ctx`: The command context, which provides access to Discord interaction data
@@ -32,7 +36,7 @@ use crate::universe::create_universe_sub_command::create_universe;
 /// ### Notes:
 /// - This command requires specifying one of the listed subcommands as it does not
 ///   have a default action.
-#[poise::command(slash_command, subcommands("create_universe", "add_server", "setup"), subcommand_required)]
-pub async fn universe(ctx: Context<'_>) -> Result<(), Error>{
+#[poise::command(slash_command, subcommands("create_universe", "add_server", "setup", "time"), subcommand_required)]
+pub async fn universe(_ctx: Context<'_>) -> Result<(), Error>{
     Ok(())
 }

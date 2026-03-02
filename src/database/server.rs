@@ -103,7 +103,7 @@ impl IdExt for Option<Id> {
 /// IDs for roles, categories, and channels used by the bot for roleplay
 /// and moderation features.
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Server {
     /// MongoDB ObjectId for this document.
     #[serde(rename = "_id")]
@@ -147,6 +147,9 @@ pub struct Server {
     pub nrp_general_channel_id: Option<Id>,
 
     pub rp_character_channel_id: Option<Id>,
+
+    pub universal_time_channel_id: Option<Id>,
+    pub universal_invite_url: Option<String>,
 }
 
 impl Default for Server {
@@ -170,6 +173,8 @@ impl Default for Server {
             commands_channel_id: None,
             nrp_general_channel_id: None,
             rp_character_channel_id: None,
+            universal_time_channel_id: None,
+            universal_invite_url: None,
         }
     }
 }
@@ -203,6 +208,8 @@ impl Server {
             commands_channel_id: self.commands_channel_id.clone(),
             nrp_general_channel_id: self.nrp_general_channel_id.clone(),
             rp_character_channel_id: self.rp_character_channel_id.clone(),
+            universal_time_channel_id: self.universal_time_channel_id.clone(),
+            universal_invite_url: self.universal_invite_url.clone(),
         }
     }
 
@@ -311,6 +318,12 @@ impl Server {
         self.nrp_general_channel_id = Some(nrp_general_channel_id.into());
         self
     }
+
+    /// Sets the universal time channel ID. Returns `self` for method chaining.
+    pub fn universal_time_channel_id(&mut self, universal_time_channel_id: impl Into<Id>) -> &mut Self {
+        self.universal_time_channel_id = Some(universal_time_channel_id.into());
+        self
+    }
     /// Sets the RP character channel ID. Returns `self` for method chaining.
     pub fn rp_character_channel_id(&mut self, rp_character_channel_id: impl Into<Id>) -> &mut Self {self.rp_character_channel_id = Some(rp_character_channel_id.into()); self}
 
@@ -393,6 +406,7 @@ impl Server {
             (&mut self.commands_channel_id, snapshot.commands_channel_id),
             (&mut self.nrp_general_channel_id, snapshot.nrp_general_channel_id),
             (&mut self.rp_character_channel_id, snapshot.rp_character_channel_id),
+            (&mut self.universal_time_channel_id, snapshot.universal_time_channel_id),
         ];
 
         let delete_futures: Vec<_> = fields
@@ -487,6 +501,9 @@ impl Server {
         }
         if snapshot.rp_wiki_channel_id.map(|x| channel_exists(x.id)) == Some(false) {
             snapshot.rp_wiki_channel_id = None;
+        }
+        if snapshot.universal_time_channel_id.map(|x| channel_exists(x.id)) == Some(false) {
+            snapshot.universal_time_channel_id = None;
         }
 
         snapshot
@@ -599,6 +616,10 @@ mod test {
             name: "test".to_string(),
             creator_id: 0,
             global_time_modifier: 100,
+            time_origin_timestamp: SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis(),
             creation_timestamp: SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()

@@ -63,8 +63,8 @@ pub async fn get_places_by_universe_id(universe_id: String) -> mongodb::error::R
         .await
 }
 
-pub async fn check_existing_place(universe_id: String, category_id: GuildChannel) -> mongodb::error::Result<Option<Place>> {
-    let filter = doc!{"category_id": category_id.id.to_string()};
+pub async fn check_existing_place(universe_id: String, category_id: u64) -> mongodb::error::Result<Option<Place>> {
+    let filter = doc!{"category_id": category_id.to_string()};
     let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
     db_client
         .database(universe_id.as_str())

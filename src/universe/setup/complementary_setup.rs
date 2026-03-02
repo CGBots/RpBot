@@ -1,6 +1,6 @@
 use serenity::all::{ChannelType};
 use crate::database::server::{Id, IdType, Server};
-use crate::discord::channels::{create_channel, get_admin_category_permission_set, get_rp_character_permission_set};
+use crate::discord::channels::{create_channel, get_admin_category_permission_set, get_rp_character_permission_set, get_universal_time_permission_set};
 use crate::discord::poise_structs::{Context, Error};
 use crate::tr;
 
@@ -285,6 +285,30 @@ pub async fn complementary_setup<'a>(ctx: &Context<'_>, server : &'a mut Server,
         }
     };
 
+    let universal_time_channel_permissions = get_universal_time_permission_set(server.everyone_role_id.clone().unwrap().id.into());
+
+    let universal_time_channel_result = match server.universal_time_channel_id{
+        None => {
+            let result = create_channel(ctx, tr!(*ctx, "universal_time_channel_name"), ChannelType::Text, 0, universal_time_channel_permissions.clone(), Some(rp_category.clone().id.get())).await;
+            match result {
+                Ok(channel) => { Ok(channel)}
+                Err(e) => {errors.push("setup__universal_time_channel_not_created"); Err(e)}
+            }
+        }
+        Some(channel_id) => {
+            match ctx.http().get_channel(channel_id.id.into()).await{
+                Ok(channel) => { Ok(channel.guild().unwrap())}
+                Err(_) => {
+                    let result = create_channel(ctx, tr!(*ctx, "universal_time_channel_name"), ChannelType::Text, 0, universal_time_channel_permissions, Some(rp_category.clone().id.get())).await;
+                    match result{
+                        Ok(channel) => { Ok(channel)}
+                        Err(e) => {errors.push("setup__universal_time_channel_not_created"); Err(e)}
+                    }
+                }
+            }
+        }
+    };
+
     if !errors.is_empty()  {
         server.rollback(ctx, snapshot).await;
         return Err("setup__channel_setup_failed".into())
@@ -296,6 +320,7 @@ pub async fn complementary_setup<'a>(ctx: &Context<'_>, server : &'a mut Server,
     let nrp_general_channel = nrp_general_channel_result.unwrap();
     let rp_character_channel = rp_character_channel.unwrap();
     let wiki_channel = wiki_channel_result.unwrap();
+    let universal_time_channel = universal_time_channel_result.unwrap();
 
 
 
@@ -308,6 +333,7 @@ pub async fn complementary_setup<'a>(ctx: &Context<'_>, server : &'a mut Server,
     server.nrp_general_channel_id(Id{id: nrp_general_channel.id.get(), id_type: IdType::Channel });
     server.rp_character_channel_id(Id{id: rp_character_channel.id.get(), id_type: IdType::Channel });
     server.rp_wiki_channel_id(Id{id: wiki_channel.id.get(), id_type: IdType::Channel });
+    server.universal_time_channel_id(Id{id: universal_time_channel.id.get(), id_type: IdType::Channel });
 
     let mut channel_order = vec![(admin_category.id, 0), (nrp_category.id, 1), (rp_category.id, 2), (server.road_category_id.unwrap().id.into(), 3)];
     let channels = ctx.guild_id().unwrap().channels(ctx).await.unwrap();

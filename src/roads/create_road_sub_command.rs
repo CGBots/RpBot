@@ -7,17 +7,30 @@ use crate::database::road::Road;
 use crate::database::server::{get_server_by_id};
 use crate::discord::poise_structs::{Context, Error};
 use crate::utility::reply::reply;
+
+fn parse_channel_id(input: &str) -> Option<u64> {
+    if let Ok(id) = input.parse::<u64>() {
+        return Some(id);
+    }
+    if input.starts_with("<#") && input.ends_with('>') {
+        if let Ok(id) = input[2..input.len() - 1].parse::<u64>() {
+            return Some(id);
+        }
+    }
+    None
+}
+
 #[poise::command(slash_command, required_permissions= "ADMINISTRATOR", guild_only)]
 pub async fn create_road(
     ctx: Context<'_>,
-    #[channel_types("Category")]
-    place_one: GuildChannel,
-    #[channel_types("Category")]
-    place_two: GuildChannel,
+    place_one: String,
+    place_two: String,
     distance: u64,
     secret_channel: Option<bool>
 ) -> Result<(), Error> {
     let Ok(_) = ctx.defer().await else { return Err("reply__reply_failed".into()) };
+
+    // Si place_one et place_two ne sont pas sur le même serveur, on vérifie qu'ils sont dans le même univers
     let result = _create_road(&ctx, place_one, place_two, distance, secret_channel).await;
     let Ok(_) = reply(ctx.clone(), result).await else { return Err("reply__reply_failed".into()) };
     Ok(())
@@ -70,8 +83,11 @@ pub async fn create_road(
 ///      Err(error_message) => eprintln!("Failed to create road: {}", error_message),
 ///  }
 ///  ```
-pub async fn _create_road(ctx: &Context<'_>, place_one : GuildChannel, place_two: GuildChannel, distance: u64, secret_channel: Option<bool>) -> Result<&'static str, Error>{
+pub async fn _create_road(ctx: &Context<'_>, place_one_str : String, place_two_str: String, distance: u64, secret_channel: Option<bool>) -> Result<&'static str, Error>{
     let guild_id = ctx.guild_id().unwrap();
+
+    let place_one_id = parse_channel_id(&place_one_str).ok_or_else(|| Error::from("create_road__invalid_place_one"))?;
+    let place_two_id = parse_channel_id(&place_two_str).ok_or_else(|| Error::from("create_road__invalid_place_two"))?;
 
     let server = get_server_by_id(guild_id.get()).await;
     let server = match server {
@@ -86,8 +102,8 @@ pub async fn _create_road(ctx: &Context<'_>, place_one : GuildChannel, place_two
 
     let universe_id = server.universe_id.clone();
 
-    let check_place_one = check_existing_place(universe_id.to_string(), place_one);
-    let check_place_two = check_existing_place(universe_id.to_string(), place_two);
+    let check_place_one = check_existing_place(universe_id.to_string(), place_one_id);
+    let check_place_two = check_existing_place(universe_id.to_string(), place_two_id);
     let (result_one, result_two) = join!(check_place_one, check_place_two);
     let place_one = match result_one {
         Ok(result) => {
@@ -109,15 +125,19 @@ pub async fn _create_road(ctx: &Context<'_>, place_one : GuildChannel, place_two
         Err(_) => {return Err("create_road__database_error".into())}
     };
 
-    if let Ok(Some(_)) = server.get_road(place_one.category_id, place_two.category_id).await {
+    if place_one.universe_id != universe_id || place_two.universe_id != universe_id {
+        return Err("create_road__universe_mismatch".into());
+    }
+
+    if let Ok(Some(_)) = server.clone().get_road(place_one.category_id, place_two.category_id).await {
         return Err("create_road__already_exists".into());
     }
 
-    let name = place_one.name + "-" + place_two.name.as_str();
+    let name = format!("{}-{}", place_one.name, place_two.name);
+    let name = if name.len() > 100 { name[..100].to_string() } else { name };
 
     let role = EditRole::new()
         .name(name.clone())
-        .position(0)
         .audit_log_reason("create new road");
 
     let new_role_result = ctx.guild_id().unwrap().create_role(ctx, role).await;
@@ -159,6 +179,9 @@ pub async fn _create_road(ctx: &Context<'_>, place_one : GuildChannel, place_two
         _id: ObjectId::default(),
         universe_id: server.universe_id,
         server_id: server.server_id,
+        server_two_id: if place_one.server_id != place_two.server_id {
+            if place_one.server_id == server.server_id { Some(place_two.server_id.to_string()) } else { Some(place_one.server_id.to_string()) }
+        } else { None },
         role_id: new_role.id.get(),
         channel_id: channel.id.get(),
         place_one_id: place_one.category_id,

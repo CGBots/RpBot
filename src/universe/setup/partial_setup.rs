@@ -228,5 +228,18 @@ pub async fn partial_setup<'a>(ctx: &Context<'_>, server: &mut Server, snapshot:
         return Err("setup__server_update_failed".into());
     };
 
+    // Create universal invite URL
+    if let Ok(channels) = guild_id.channels(ctx).await {
+        let mut channels: Vec<_> = channels.into_values().collect();
+        channels.sort_by_key(|c| c.position);
+        let target_channel = channels.iter().find(|c| c.is_text_based() && c.kind != serenity::all::ChannelType::Voice && c.kind != serenity::all::ChannelType::Stage);
+        if let Some(target_channel) = target_channel {
+            if let Ok(invite) = target_channel.id.create_invite(ctx, serenity::all::CreateInvite::new().max_age(0).max_uses(0).unique(true)).await {
+                server.universal_invite_url = Some(invite.url());
+                let _ = server.update().await;
+            }
+        }
+    }
+
     Ok("setup__setup_success_message")
 }

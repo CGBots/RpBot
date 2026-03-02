@@ -214,6 +214,11 @@ setup__rp_character_channel_not_created = Salon de fiches personnages non créé
     .title = Erreur de création
     .message = Impossible de créer le salon de fiches personnages
             Veuillez ressayer ou contacter le support si le problème persiste: {$support}
+universal_time_channel_name = Temps universel
+setup__universal_time_channel_not_created = Salon de temps universel non créé
+    .title = Erreur de création
+    .message = Impossible de créer le salon de temps universel
+            Veuillez ressayer ou contacter le support si le problème persiste: {$support}
 rp_wiki_channel_name = Wiki
 setup__wiki_channel_not_created = Salon wiki non créé
     .title = Erreur de création
@@ -346,12 +351,21 @@ create_road__insert_road_failed_rollback_role_failed = Erreur critique
     .title = Erreur critique
     .message = L'enregistrement de la route a échoué et l'annulation du rôle a échoué.
             Veuillez contacter le support: {$support}
+create_road__invalid_place_one = Identifiant du premier lieu invalide
+    .title = Premier lieu invalide
+    .message = L'identifiant ou la mention du premier lieu est invalide. Utilisez un ID ou une mention <#id>.
+create_road__invalid_place_two = Identifiant du second lieu invalide
+    .title = Second lieu invalide
+    .message = L'identifiant ou la mention du second lieu est invalide. Utilisez un ID ou une mention <#id>.
 create_road__success = Route créée
     .title = Route créée
     .message = La route a été créée avec succès
 create_road__already_exists = Route déjà existante
     .title = Route existante
     .message = Une route existe déjà entre ces deux lieux.
+create_road__universe_mismatch = Univers différent
+    .title = Univers différent
+    .message = Les deux lieux doivent appartenir au même univers.
 
 #Create character
 create_character = nouveau_personnage
@@ -450,7 +464,7 @@ accept_character__no_player_role_id = Serveur non setup
 travel = voyage
     .description = Commande pour se déplacer d'un lieu à un autre.
     .destination = destination
-    .destination-description = Le lieu de destination (rôle associé au lieu)
+    .destination-description = Le lieu de destination (ID de catégorie ou mention <#id>)
 travel__server_not_found = Serveur introuvable
     .title = Serveur introuvable
     .message = Le serveur ne semble pas être enregistré.
@@ -476,3 +490,21 @@ move_from_place__road_not_found = Aucune route trouvée
 travel__moving_to_place = **_{$user} se déplace vers {$destination}._**
 travel__reached_destination = **_{$user} est arrivé à {$destination}._**
 travel__arrived_at_destination = **_{$user} viens d'arriver._**
+travel__invitation = Frontière atteinte
+    .title = Frontière atteinte
+    .message = **_{$user}, tu arrive à la frontière d'une région de l'univers {$universe} ! Voici l'invitation pour continuer ton voyage : {$link} _**
+
+# Temps Universel
+time = temps
+    .description = Affiche l'heure actuelle de l'univers.
+universe_time__current_time = Heure de l'univers
+    .title = Temps Universel
+    .message = Il est actuellement **{$time}** dans cet univers.
+        Phase actuelle : **{$phase}**
+universe_time__invalid_modifier = Modificateur de temps invalide
+    .title = Erreur de temps
+    .message = Le modificateur de temps de l'univers est invalide.
+time__midnight = **_Il est minuit. Le silence s'abat sur l'univers._**
+time__sunrise = **_Le soleil se lève, une nouvelle journée commence._**
+time__noon = **_Il est midi. Le soleil est au zénith._**
+time__sunset = **_Le soleil se couche, les ombres s'allongent._**

@@ -1,4 +1,4 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use chrono::{Utc, TimeZone};
 use crate::database::universe::{Universe};
 use crate::discord::poise_structs::*;
 use crate::database::server::{get_server_by_id, Server};
@@ -116,12 +116,24 @@ pub async fn _create_universe(
 
     if server.is_some(){ return Err("create_universe__already_exist_for_this_server".into()) }
 
+    let now = Utc::now();
+    let now_ms = now.timestamp_millis() as u128;
+    
+    // Synchroniser le temps sur le temps IRL (UTC)
+    // On veut que "Midi" (Noon, index 2) soit l'ancre à 12:00 UTC.
+    // Le cycle dure 24h (86400s) à 100% de vitesse.
+    // Midnight (index 0) est à 00:00 UTC.
+    // Donc l'origine (Midnight) est le début de la journée IRL actuelle (00:00 UTC).
+    let midnight_utc = Utc.from_utc_datetime(&now.date_naive().and_hms_opt(0, 0, 0).unwrap());
+    let time_origin_ms = midnight_utc.timestamp_millis() as u128;
+
     let universe = Universe {
         universe_id: Default::default(),
         name: universe_name.clone(),
         creator_id: ctx.author().id.get(),
         global_time_modifier: 100,
-        creation_timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis()
+        time_origin_timestamp: time_origin_ms,
+        creation_timestamp: now_ms
     };
 
     match universe.insert_universe().await{

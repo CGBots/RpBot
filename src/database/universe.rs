@@ -63,6 +63,9 @@ pub struct Universe {
     pub global_time_modifier: u32,
 
     #[serde_as(as = "DisplayFromStr")]
+    pub time_origin_timestamp: u128,
+
+    #[serde_as(as = "DisplayFromStr")]
     pub creation_timestamp: u128,
 }
 
@@ -293,6 +296,7 @@ impl Universe {
             name: self.name.clone(),
             creator_id: self.creator_id.clone(),
             global_time_modifier: self.global_time_modifier.clone(),
+            time_origin_timestamp: self.time_origin_timestamp.clone(),
             creation_timestamp: self.creation_timestamp.clone(),
         }
     }
@@ -727,6 +731,10 @@ mod test {
             name: "test".to_string(),
             creator_id: 0,
             global_time_modifier: 100,
+            time_origin_timestamp: SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis(),
             creation_timestamp: SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()

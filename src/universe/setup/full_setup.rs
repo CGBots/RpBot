@@ -29,7 +29,7 @@ use crate::universe::setup::partial_setup::partial_setup;
 /// }
 /// ```
 pub async fn full_setup<'a>(ctx: &Context<'_>, server: &'a mut Server, snapshot: Server) -> Result<&'static str, Error> {
-    let Ok(_) = partial_setup(ctx, server, snapshot).await else { return Err("setup_server__failed".into()) };
+    let Ok(_) = partial_setup(ctx, server, snapshot.clone()).await else { return Err("setup_server__failed".into()) };
     let Ok(_) = complementary_setup(ctx, server, snapshot).await else { return Err("setup_server__failed".into()) };
     Ok("setup__full_setup_success")
 }

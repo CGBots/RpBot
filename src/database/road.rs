@@ -16,6 +16,7 @@ pub struct Road{
     pub universe_id: ObjectId,
     #[serde_as(as = "DisplayFromStr")]
     pub server_id: u64,
+    pub server_two_id: Option<String>,
     #[serde_as(as = "DisplayFromStr")]
     pub role_id: u64,
     #[serde_as(as = "DisplayFromStr")]

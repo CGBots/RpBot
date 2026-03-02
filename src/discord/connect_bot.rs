@@ -154,8 +154,6 @@ pub async fn connect_bot() -> Result<Client, ()>{
             *http_client = Some(client.http.clone());
         }
 
-        let _ = crate::travel::logic::setup().await;
-
         if let Err(why) = client.start_shards(SHARD_NUMBER).await {
             println!("Client error: {why:?}");
         }

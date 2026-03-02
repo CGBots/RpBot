@@ -148,6 +148,16 @@ pub fn get_rp_character_permission_set(player_role_id: RoleId) -> Vec<Permission
     ]
 }
 
+pub fn get_universal_time_permission_set(everyone_role_id: RoleId) -> Vec<PermissionOverwrite> {
+    vec![
+        PermissionOverwrite {
+            allow: Permissions::VIEW_CHANNEL | Permissions::READ_MESSAGE_HISTORY,
+            deny: Permissions::SEND_MESSAGES,
+            kind: PermissionOverwriteType::Role(everyone_role_id),
+        },
+    ]
+}
+
 /// Asynchronously creates a new channel in a Discord guild.
 ///
 /// # Parameters
