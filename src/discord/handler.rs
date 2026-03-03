@@ -9,11 +9,15 @@ use poise::serenity_prelude::{EventHandler};
 
 #[allow(unused_imports)]
 #[cfg(not(test))] use serenity::all::ActivityData;
-use serenity::all::{CreateInteractionResponse, CreateInteractionResponseMessage, Interaction};
+use serenity::all::{CreateInteractionResponse, CreateInteractionResponseMessage, Interaction, Member};
 use crate::characters::create_character_sub_command::{accept_character, choose_character_place, delete_character, modify_character, refuse_character, submit_character};
 #[allow(unused_imports)]
 use crate::translation::{apply_translations, tr};
 use crate::tr_locale;
+use crate::travel::travel__sub_command::{_travel, travel_from_handler};
+use crate::database::server::get_server_by_id;
+use crate::database::travel::SpaceType;
+use crate::travel::logic::manage_roles;
 
 /// The `Handler` struct serves as a placeholder or marker in this context.
 ///
@@ -77,8 +81,6 @@ impl EventHandler for Handler {
         }
     }
 
-
-
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         match interaction.message_component(){
             None => {}
@@ -91,6 +93,7 @@ impl EventHandler for Handler {
                     "create_character__accept_character" => accept_character(ctx.clone(), modal.clone()).await,
                     "create_character__modify_character" => modify_character(ctx.clone(), modal.clone()).await,
                     "create_character__choose_place" => choose_character_place(ctx.clone(), modal.clone()).await,
+                    "select__menu__chose_destination" => travel_from_handler(ctx.clone(), modal.clone()).await,
                     _ => return,
                 };
 
@@ -102,6 +105,62 @@ impl EventHandler for Handler {
                             .content(content)
                             .ephemeral(true)
                     )).await;
+                }
+            }
+        }
+    }
+
+    async fn guild_member_addition(&self, ctx: Context, new_member: Member) {
+        let guild_id = new_member.guild_id.get();
+        let user_id = new_member.user.id.get();
+
+        // Récupérer le serveur dans la DB
+        let server = match get_server_by_id(guild_id).await {
+            Ok(Some(s)) => s,
+            _ => return,
+        };
+
+        // Vérifier si un personnage existe pour cette personne
+        if let Ok(Some(character)) = server.clone().has_character(user_id).await {
+            // 1. Attribuer le rôle de joueur si configuré
+            if let Some(player_role) = &server.player_role_id {
+                manage_roles(ctx.http.clone(), guild_id, user_id, Some(player_role.id), None).await;
+            }
+
+            // 2. Renommer le joueur
+            let nickname = if (character.name.to_string() + "│" + new_member.user.display_name()).chars().count() > 32 {
+                character.name.to_string()
+            } else {
+                character.name.to_string() + "│" + new_member.user.display_name()
+            };
+            
+            let _ = ctx.http.edit_member(
+                new_member.guild_id,
+                new_member.user.id,
+                &serenity::all::EditMember::new().nickname(nickname),
+                None
+            ).await;
+
+            // 3. Vérifier le PlayerMove pour attribuer le rôle du lieu ou de la route
+            if let Ok(Some(player_move)) = server.get_player_move(user_id).await {
+                match player_move.actual_space_type {
+                    SpaceType::Place => {
+                        // On vérifie si le lieu actuel est bien sur ce serveur
+                        if let Ok(Some(place)) = crate::database::places::get_place_by_category_id(player_move.universe_id, player_move.actual_space_id).await {
+                            if place.server_id == guild_id {
+                                manage_roles(ctx.http.clone(), guild_id, user_id, Some(place.role), None).await;
+                            }
+                        }
+                    }
+                    SpaceType::Road => {
+                        // On vérifie si la route actuelle est bien sur ce serveur ou si c'est le road_server_id
+                        let road_server_id = player_move.road_server_id.unwrap_or(player_move.server_id);
+                        if road_server_id == guild_id {
+                            if let Some(road_role) = player_move.road_role_id {
+                                manage_roles(ctx.http.clone(), guild_id, user_id, Some(road_role), None).await;
+                            }
+                        }
+                    }
                 }
             }
         }

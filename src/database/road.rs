@@ -1,6 +1,7 @@
 use mongodb::bson::doc;
 use serde_with::DisplayFromStr;
 use mongodb::bson::oid::ObjectId;
+use mongodb::Cursor;
 use mongodb::results::InsertOneResult;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -17,6 +18,7 @@ pub struct Road{
     #[serde_as(as = "DisplayFromStr")]
     pub server_id: u64,
     pub server_two_id: Option<String>,
+    pub road_name: String,
     #[serde_as(as = "DisplayFromStr")]
     pub role_id: u64,
     #[serde_as(as = "DisplayFromStr")]
@@ -50,5 +52,56 @@ pub async fn get_road_by_channel_id(universe_id: ObjectId, channel_id: u64) -> m
         .database(universe_id.to_string().as_str())
         .collection::<Road>(ROADS_COLLECTION_NAME)
         .find_one(filter)
+        .await
+}
+
+pub async fn get_road_by_source(universe_id: ObjectId, destination_id: u64) -> mongodb::error::Result<Cursor<Road>> {
+    let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }).await;
+    let filter = doc! {
+        "$or": [
+            { "place_one_id": destination_id.to_string() },
+            { "place_two_id": destination_id.to_string() }
+        ],
+        "secret": false
+    };
+    db_client.database(universe_id.to_string().as_str())
+        .collection::<Road>(ROADS_COLLECTION_NAME)
+        .find(filter)
+        .await
+}
+
+pub async fn get_road(universe_id: ObjectId, place_one: u64, place_two: u64) -> mongodb::error::Result<Option<Road>> {
+    let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }).await;
+    println!("universe_id: {}, place_one_id: {}, place_two_id: {}",universe_id, place_one, place_two);
+    let filter = doc! {
+        "$or": [
+            {
+                "place_one_id": place_one.to_string(),
+                "place_two_id": place_two.to_string()
+            },
+            {
+                "place_one_id": place_two.to_string(),
+                "place_two_id": place_one.to_string()
+            }
+        ]
+    };
+    db_client.database(universe_id.to_string().as_str())
+        .collection::<Road>(ROADS_COLLECTION_NAME)
+        .find_one(filter)
+        .await
+}
+
+pub async fn count_non_secret_roads_for_place(universe_id: ObjectId, place_id: u64) -> mongodb::error::Result<u64> {
+    let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await;
+    let filter = doc! {
+        "$or": [
+            { "place_one_id": place_id.to_string() },
+            { "place_two_id": place_id.to_string() }
+        ],
+        "secret": false
+    };
+    db_client.database(universe_id.to_string().as_str())
+        .collection::<Road>(ROADS_COLLECTION_NAME)
+        .count_documents(filter)
         .await
 }

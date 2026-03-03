@@ -350,6 +350,9 @@ create_road__insert_road_failed_rollback_role_failed = Critical error
 create_road__success = Road created
     .title = Road created
     .message = The road has been successfully created
+create_road__limit_reached = Road limit reached
+    .title = Limit reached
+    .message = One of the places has already reached the maximum of 25 roads (excluding secret roads).
 
 #Create character
 create_character = new_character
@@ -443,33 +446,62 @@ accept_character__no_player_role_id = Server not configured
     .title = Server not configured
     .message = The {player_role_name} role hasn't been found.
 
-#Travels
 travel = travel
     .description = Command to move from one place to another.
     .destination = destination
-    .destination-description = The destination location (role associated with the place)
+    .destination-description = The destination place (category ID or mention <#id>)
 travel__server_not_found = Server not found
     .title = Server not found
     .message = The server does not appear to be registered.
 travel__place_not_found = Place not found
     .title = Place not found
-    .message = The specified destination place does not exist in this universe.
+    .message = The specified destination does not exist in this universe.
 travel__character_not_found = Character not found
     .title = Character not found
     .message = You do not have a character in this universe.
-travel__started = Travel started
-    .title = Travel started
+travel__database_error = Database error
+    .title = Database error
+    .message = An error occurred while accessing the database.
+travel_without_destination__database_error = Database error
+    .title = Database error
+    .message = Unable to retrieve available roads.
+travel_without_destination__reply_failed = Sending error
+    .title = Sending error
+    .message = Unable to display the destination selection menu.
+travel__source_place_not_found = Source place not found
+    .title = Source place not found
+    .message = Your current position is not recognized as a valid place.
+travel__started = Journey started
+    .title = Journey started
     .message = You have started your journey to {$destination}.
 travel__already_moving_to_destination = Already on the way
     .title = Already on the way
     .message = You are already moving toward this destination.
 travel__invalid_road_destination = Invalid destination
     .title = Invalid destination
-    .message = You cannot go to this location from your current position on the road.
+    .message = You cannot go to this place from your current position on the road.
 move_from_place__road_not_found = No road found
     .title = No road found
     .message = There is no direct road between your current position and {$destination}.
 
-travel__moving_to_place = **_{$user} is moving toward {$destination}._**
-travel__reached_destination = **_{$user} has reached {$destination}._**
-travel__arrived_at_destination = **_{$user} has arrived at the destination._**
+travel__moving_to_place = `{$user} is moving toward {$destination}.`
+travel__reached_destination = `{$user} has reached {$destination}.`
+travel__arrived_at_destination = `{$user} has just arrived.`
+travel__invitation = Border reached
+    .title = Border reached
+    .message = **_{$user}, you have reached the border of a region in the universe {$universe}! Here is the invitation to continue your journey: {$link} _**
+
+# Universal Time
+time = time
+    .description = Displays the current time of the universe.
+universe_time__current_time = Universe Time
+    .title = Universal Time
+    .message = It is currently **{$time}** in this universe.
+            Current phase: **{$phase}**
+universe_time__invalid_modifier = Invalid time modifier
+    .title = Time Error
+    .message = The universe time modifier is invalid.
+time__midnight = **_It is midnight. Silence falls upon the universe._**
+time__sunrise = **_The sun rises, a new day begins._**
+time__noon = **_It is noon. The sun is at its zenith._**
+time__sunset = **_The sun sets, the shadows grow longer._**

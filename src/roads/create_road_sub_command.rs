@@ -3,7 +3,7 @@ use serenity::all::{CreateChannel, GuildChannel, PermissionOverwrite, Permission
 use serenity::builder::EditRole;
 use tokio::join;
 use crate::database::places::{check_existing_place};
-use crate::database::road::Road;
+use crate::database::road::{Road, count_non_secret_roads_for_place};
 use crate::database::server::{get_server_by_id};
 use crate::discord::poise_structs::{Context, Error};
 use crate::utility::reply::reply;
@@ -133,6 +133,17 @@ pub async fn _create_road(ctx: &Context<'_>, place_one_str : String, place_two_s
         return Err("create_road__already_exists".into());
     }
 
+    let secret_channel_value = if secret_channel.is_some() {secret_channel.unwrap()} else {false};
+
+    if !secret_channel_value {
+        let count_one = count_non_secret_roads_for_place(universe_id, place_one.category_id).await.map_err(|_| Error::from("create_road__database_error"))?;
+        let count_two = count_non_secret_roads_for_place(universe_id, place_two.category_id).await.map_err(|_| Error::from("create_road__database_error"))?;
+        
+        if count_one >= 25 || count_two >= 25 {
+            return Err("create_road__limit_reached".into());
+        }
+    }
+
     let name = format!("{}-{}", place_one.name, place_two.name);
     let name = if name.len() > 100 { name[..100].to_string() } else { name };
 
@@ -158,7 +169,7 @@ pub async fn _create_road(ctx: &Context<'_>, place_one_str : String, place_two_s
         kind: PermissionOverwriteType::Role(RoleId::new(guild_id.get())),
     }];
 
-    let channel = CreateChannel::new(name)
+    let channel = CreateChannel::new(name.clone())
         .permissions(permissions)
         .category(server.road_category_id.unwrap().id);
 
@@ -173,8 +184,6 @@ pub async fn _create_road(ctx: &Context<'_>, place_one_str : String, place_two_s
         }
     };
 
-    let secret_channel_value = if secret_channel.is_some() {secret_channel.unwrap()} else {false};
-
     let road = Road{
         _id: ObjectId::default(),
         universe_id: server.universe_id,
@@ -182,6 +191,7 @@ pub async fn _create_road(ctx: &Context<'_>, place_one_str : String, place_two_s
         server_two_id: if place_one.server_id != place_two.server_id {
             if place_one.server_id == server.server_id { Some(place_two.server_id.to_string()) } else { Some(place_one.server_id.to_string()) }
         } else { None },
+        road_name: name,
         role_id: new_role.id.get(),
         channel_id: channel.id.get(),
         place_one_id: place_one.category_id,

@@ -40,4 +40,14 @@ impl Character {
             .find_one(filter)
             .await
     }
+
+    pub async fn get_character_by_user_id(universe_id: ObjectId, user_id: u64) -> mongodb::error::Result<Option<Character>> {
+        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+        let filter = doc!{"user_id": user_id.to_string()};
+        db_client
+            .database(universe_id.to_string().as_str())
+            .collection::<Character>(CHARACTERS_COLLECTION_NAME)
+            .find_one(filter)
+            .await
+    }
 }

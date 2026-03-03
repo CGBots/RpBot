@@ -750,6 +750,7 @@ pub async fn choose_character_place(ctx: SerenityContext, component_interaction:
         step_end_timestamp: None,
         road_role_id: None,
         road_id: None,
+        road_server_id: None,
         destination_id: None,
         destination_role_id: None,
         destination_server_id: None,

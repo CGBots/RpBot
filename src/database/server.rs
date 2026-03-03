@@ -11,7 +11,7 @@ use serde_with::{DisplayFromStr, serde_as};
 use crate::database::db_client::{DB_CLIENT, connect_db};
 use crate::database::db_namespace::{CHARACTERS_COLLECTION_NAME, VERSEENGINE_DB_NAME, SERVERS_COLLECTION_NAME, ROADS_COLLECTION_NAME, TRAVELS_COLLECTION_NAME};
 use crate::database::characters::Character;
-use crate::database::road::Road;
+use crate::database::road::{get_road, Road};
 use crate::database::travel::PlayerMove;
 use crate::discord::poise_structs::{Context, Error};
 
@@ -510,13 +510,7 @@ impl Server {
     }
 
     pub async fn get_character_by_user_id(self, user_id: u64) -> mongodb::error::Result<Option<Character>> {
-        let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }) .await .clone();
-        let filter = doc!{"user_id": user_id.to_string()};
-        db_client
-            .database(self.universe_id.to_string().as_str())
-            .collection::<Character>(CHARACTERS_COLLECTION_NAME)
-            .find_one(filter)
-            .await
+        Character::get_character_by_user_id(self.universe_id, user_id).await
     }
 
     pub async fn has_character(self, user_id: u64) -> mongodb::error::Result<Option<Character>> {
@@ -551,29 +545,7 @@ impl Server {
     }
     
     pub async fn get_road(self, place_one: u64, place_two: u64) -> mongodb::error::Result<Option<Road>> {
-        let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }).await;
-        println!("place_one_id: {}, place_two_id: {}", place_one, place_two);
-        let filter = doc!{
-            "$or": [
-                doc!{
-                    "$and": [
-                        doc!{"place_one_id": place_one.to_string()},
-                        doc!{"place_two_id": place_two.to_string()}
-                    ]
-                },
-                doc!{
-                    "$and": [
-                        doc!{"place_one_id": place_two.to_string()},
-                        doc!{"place_two_id": place_one.to_string()}
-                    ]
-                }
-            ]
-
-        };
-        db_client.database(self.universe_id.to_string().as_str())
-            .collection::<Road>(ROADS_COLLECTION_NAME)
-            .find_one(filter)
-            .await
+        get_road(self.universe_id, place_one, place_two).await
     }
 }
 
