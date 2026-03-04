@@ -48,6 +48,7 @@ pub async fn create_universe(
 ) -> Result<(), Error> {
     let Ok(_) = ctx.defer().await else { return Err("reply__reply_failed".into()) };
     let result = _create_universe(&ctx, universe_name, setup_type).await;
+    println!("{:?}", result);
     let Ok(_) = reply(ctx.clone(), result).await else { return Err("reply__reply_failed".into()) };
     Ok(())
 }

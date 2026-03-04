@@ -42,7 +42,7 @@ use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use crate::database::db_client::{connect_db, DB_CLIENT};
-use crate::database::db_namespace::{CHARACTERS_COLLECTION_NAME, PLACES_COLLECTION_NAME, ROADS_COLLECTION_NAME, STATS_COLLECTION_NAME};
+use crate::database::db_namespace::{CHARACTERS_COLLECTION_NAME, PLACES_COLLECTION_NAME, ROADS_COLLECTION_NAME, STATS_COLLECTION_NAME, VERSEENGINE_DB_NAME};
 use crate::database::modifiers::{Modifier, ModifierType};
 use crate::database::characters::Character;
 use crate::database::places::Place;
@@ -245,7 +245,7 @@ impl Stat {
     pub async fn insert_stat(&self) -> Result<Stat, Error>{
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         let result = db_client
-            .database(&*self.universe_id.to_string())
+            .database(VERSEENGINE_DB_NAME)
             .collection::<Stat>(STATS_COLLECTION_NAME)
             .insert_one(self)
             .await;
@@ -294,9 +294,9 @@ impl Stat {
     /// - The query execution fails.
     pub async fn get_stat_by_name(universe_id: &str, name: &str) -> mongodb::error::Result<Option<Stat>> {
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
-        let filter = doc! { "name": name };
+        let filter = doc! { "name": name, "universe_id": universe_id };
         db_client
-            .database(universe_id)
+            .database(VERSEENGINE_DB_NAME)
             .collection::<Stat>(STATS_COLLECTION_NAME)
             .find_one(filter)
             .await
@@ -347,25 +347,25 @@ impl Stat {
 
     pub async fn resolve(self, category_id: u64, user_id: u64) -> Result<(StatValue, Option<Modifier>), Error> {
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
-        let db = db_client.database(&self.universe_id.to_string());
+        let db = db_client.database(VERSEENGINE_DB_NAME);
 
         // 1. Recover stat in the universe (global)
         let mut universe_stat = db.collection::<Stat>(STATS_COLLECTION_NAME)
-            .find_one(doc! { "name": &self.name })
+            .find_one(doc! { "name": &self.name, "universe_id":  self.universe_id })
             .await.unwrap_or_else(|_| None);
 
         // 2. Recover location stat/modifiers
         let mut road = db.collection::<Road>(ROADS_COLLECTION_NAME)
             .find_one(doc! { "$or": [
-                { "channel_id": category_id.to_string() },
-                { "place_one_id": category_id.to_string() },
-                { "place_two_id": category_id.to_string() }
+                { "channel_id": category_id.to_string(), "universe_id":  self.universe_id},
+                { "place_one_id": category_id.to_string(), "universe_id":  self.universe_id },
+                { "place_two_id": category_id.to_string(), "universe_id":  self.universe_id }
             ] })
             .await.unwrap_or_else(|_| None);
 
         // 3. Recover player stat/modifiers
         let mut character = match db.collection::<Character>(CHARACTERS_COLLECTION_NAME)
-            .find_one(doc! { "user_id": user_id.to_string() })
+            .find_one(doc! { "user_id": user_id.to_string(), "universe_id":  self.universe_id })
             .await {
                 Ok(res) => res,
                 Err(_) => return Err("resolve_stat__database_error".into())
@@ -486,8 +486,8 @@ impl Stat {
 
 pub async fn get_stat_by_name(universe_id: ObjectId, name: &str) -> mongodb::error::Result<Option<Stat>> {
     let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
-    let db = db_client.database(universe_id.to_string().as_str());
-    db.collection::<Stat>(STATS_COLLECTION_NAME)
-        .find_one(doc! { "name": name })
+    db_client.database(VERSEENGINE_DB_NAME)
+        .collection::<Stat>(STATS_COLLECTION_NAME)
+        .find_one(doc! { "name": name, "universe_id":  universe_id })
         .await
 }

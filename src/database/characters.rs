@@ -5,7 +5,7 @@ use mongodb::results::InsertOneResult;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use crate::database::db_client::{connect_db, DB_CLIENT};
-use crate::database::db_namespace::{CHARACTERS_COLLECTION_NAME, TRAVELS_COLLECTION_NAME};
+use crate::database::db_namespace::{CHARACTERS_COLLECTION_NAME, TRAVELS_COLLECTION_NAME, VERSEENGINE_DB_NAME};
 use crate::database::stats::Stat;
 use crate::database::travel::PlayerMove;
 
@@ -25,17 +25,17 @@ impl Character {
     pub async fn update(self) -> mongodb::error::Result<InsertOneResult> {
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         db_client
-            .database(self.universe_id.to_string().as_str())
+            .database(VERSEENGINE_DB_NAME)
             .collection::<Character>(CHARACTERS_COLLECTION_NAME)
             .insert_one(self)
             .await
     }
 
     pub async fn get_player_move(self) -> mongodb::error::Result<Option<PlayerMove>> {
-        let filter = doc!{"player_id": self._id};
+        let filter = doc!{"player_id": self._id, "universe_id": self.universe_id};
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         db_client
-            .database(self.universe_id.to_string().as_str())
+            .database(VERSEENGINE_DB_NAME)
             .collection::<PlayerMove>(TRAVELS_COLLECTION_NAME)
             .find_one(filter)
             .await
@@ -43,9 +43,9 @@ impl Character {
 
     pub async fn get_character_by_user_id(universe_id: ObjectId, user_id: u64) -> mongodb::error::Result<Option<Character>> {
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
-        let filter = doc!{"user_id": user_id.to_string()};
+        let filter = doc!{"user_id": user_id.to_string(), "universe_id": universe_id};
         db_client
-            .database(universe_id.to_string().as_str())
+            .database(VERSEENGINE_DB_NAME)
             .collection::<Character>(CHARACTERS_COLLECTION_NAME)
             .find_one(filter)
             .await

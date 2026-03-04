@@ -51,12 +51,15 @@ use crate::database::server::Server;
 /// # Note
 /// - The MongoDB server is assumed to be running locally (`localhost`) on the default port `27017`.
 /// - The connection is authenticated against the `admin` database.
-pub async fn connect_db() -> Result<mongodb::Client, mongodb::error::Error> {
+pub async fn connect_db() -> Result<mongodb::Client, mongodb::error::Error>{
     let user = env::var("MONGODB_USER").expect("Expected a database user in the environment");
-    let user = encode(&user);
+    let user = encode(user.as_str());
     let password = env::var("MONGODB_PASSWORD").expect("Expected a database password in the environment");
-    let password = encode(&password);
-    let url = format!("mongodb://{user}:{password}@localhost:27017/?authSource=admin");
+    let password = encode(password.as_str());
+    let host = env::var("MONGODB_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let port = env::var("MONGODB_PORT").unwrap_or_else(|_| "27017".to_string());
+    let auth_source = env::var("MONGODB_AUTH_SOURCE").unwrap_or_else(|_| "admin".to_string());
+    let url = format!("mongodb://{user}:{password}@{host}:{port}/?authSource={auth_source}");
     mongodb::Client::with_uri_str(url).await
 }
 
@@ -117,12 +120,13 @@ pub static DB_CLIENT: OnceCell<mongodb::Client> = OnceCell::const_new();
 #[cfg(test)]
 mod test {
     use crate::database::db_client::{DB_CLIENT, connect_db};
+    use crate::database::db_namespace::VERSEENGINE_DB_NAME;
 
     /// Ensures that the database connection initializes correctly.
     #[tokio::test]
     async fn test_connect_db() {
         let client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await;
-        match client.database("test").list_collection_names().await {
+        match client.database(VERSEENGINE_DB_NAME).list_collection_names().await {
             Ok(_) => {assert!(true)}
             Err(_) => {assert!(false)}
         };

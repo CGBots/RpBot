@@ -102,8 +102,8 @@ pub async fn _create_road(ctx: &Context<'_>, place_one_str : String, place_two_s
 
     let universe_id = server.universe_id.clone();
 
-    let check_place_one = check_existing_place(universe_id.to_string(), place_one_id);
-    let check_place_two = check_existing_place(universe_id.to_string(), place_two_id);
+    let check_place_one = check_existing_place(universe_id, place_one_id);
+    let check_place_two = check_existing_place(universe_id, place_two_id);
     let (result_one, result_two) = join!(check_place_one, check_place_two);
     let place_one = match result_one {
         Ok(result) => {

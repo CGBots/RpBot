@@ -13,12 +13,11 @@ use serenity::utils::CreateQuickModal;
 use crate::database::server::{get_server_by_id, Server};
 use crate::{tr, tr_locale};
 use crate::database::characters::Character;
-use crate::database::db_namespace::{CHARACTERS_COLLECTION_NAME, TRAVELS_COLLECTION_NAME};
+use crate::database::db_namespace::{CHARACTERS_COLLECTION_NAME, VERSEENGINE_DB_NAME};
 use crate::database::places::{Place};
 use crate::database::stats::{Stat, StatValue};
-use crate::database::travel::{PlayerMove, SpaceType};
+use crate::database::travel::{PlayerMove};
 use crate::database::universe::get_universe_by_id;
-use crate::universe::universe;
 
 pub static CHARACTER_MODAL_TITLE: &str = "character_modal_title";
 pub static MODIFY_CHARACTER_BUTTON_CUSTOM_ID: &str = "create_character__modify_character";
@@ -687,7 +686,7 @@ pub async fn choose_character_place(ctx: SerenityContext, component_interaction:
     let db_client = crate::database::db_client::DB_CLIENT.get_or_init(|| async { crate::database::db_client::connect_db().await.unwrap() }).await.clone();
     let filter = mongodb::bson::doc!{"category_id": selected_category_id.get().to_string()};
     let place: Option<Place> = db_client
-        .database(&*server.universe_id.to_string())
+        .database(VERSEENGINE_DB_NAME)
         .collection::<Place>(crate::database::db_namespace::PLACES_COLLECTION_NAME)
         .find_one(filter)
         .await
@@ -733,9 +732,9 @@ pub async fn choose_character_place(ctx: SerenityContext, component_interaction:
     let player_id = component_interaction.message.embeds.get(0).unwrap();
     let player_id = player_id.footer.clone().unwrap();
     let player_id = player_id.text.as_str();
-    let character_filter = doc!{"user_id": player_id};
+    let character_filter = doc!{"user_id": player_id, "universe_id": server.universe_id};
 
-    let Ok(Some(character)) = db_client.database(place.universe_id.to_string().as_str()).collection::<Character>(CHARACTERS_COLLECTION_NAME)
+    let Ok(Some(character)) = db_client.database(VERSEENGINE_DB_NAME).collection::<Character>(CHARACTERS_COLLECTION_NAME)
         .find_one(character_filter).await else {return Err("create_character__database_error".into())};
 
     let player_move = PlayerMove{

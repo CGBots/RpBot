@@ -6,7 +6,7 @@ use mongodb::results::InsertOneResult;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use crate::database::db_client::{connect_db, DB_CLIENT};
-use crate::database::db_namespace::ROADS_COLLECTION_NAME;
+use crate::database::db_namespace::{ROADS_COLLECTION_NAME, VERSEENGINE_DB_NAME};
 use crate::database::modifiers::Modifier;
 
 #[serde_as]
@@ -37,7 +37,7 @@ impl Road{
     pub async fn insert(self) -> mongodb::error::Result<InsertOneResult> {
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         db_client
-            .database(&*self.universe_id.to_string())
+            .database(VERSEENGINE_DB_NAME)
             .collection::<Road>(ROADS_COLLECTION_NAME)
             .insert_one(self)
             .await
@@ -45,11 +45,10 @@ impl Road{
 }
 
 pub async fn get_road_by_channel_id(universe_id: ObjectId, channel_id: u64) -> mongodb::error::Result<Option<Road>> {
-    let filter = doc!{"channel_id": channel_id.to_string().as_str()};
-    println!("channel_id: {}", channel_id);
+    let filter = doc!{"channel_id": channel_id.to_string().as_str(), "universe_id": universe_id};
     let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
     db_client
-        .database(universe_id.to_string().as_str())
+        .database(VERSEENGINE_DB_NAME)
         .collection::<Road>(ROADS_COLLECTION_NAME)
         .find_one(filter)
         .await
@@ -59,12 +58,12 @@ pub async fn get_road_by_source(universe_id: ObjectId, destination_id: u64) -> m
     let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }).await;
     let filter = doc! {
         "$or": [
-            { "place_one_id": destination_id.to_string() },
-            { "place_two_id": destination_id.to_string() }
+            { "place_one_id": destination_id.to_string(), "universe_id": universe_id },
+            { "place_two_id": destination_id.to_string(), "universe_id": universe_id },
         ],
         "secret": false
     };
-    db_client.database(universe_id.to_string().as_str())
+    db_client.database(VERSEENGINE_DB_NAME)
         .collection::<Road>(ROADS_COLLECTION_NAME)
         .find(filter)
         .await
@@ -72,20 +71,21 @@ pub async fn get_road_by_source(universe_id: ObjectId, destination_id: u64) -> m
 
 pub async fn get_road(universe_id: ObjectId, place_one: u64, place_two: u64) -> mongodb::error::Result<Option<Road>> {
     let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }).await;
-    println!("universe_id: {}, place_one_id: {}, place_two_id: {}",universe_id, place_one, place_two);
     let filter = doc! {
         "$or": [
             {
                 "place_one_id": place_one.to_string(),
-                "place_two_id": place_two.to_string()
+                "place_two_id": place_two.to_string(),
+                "universe_id": universe_id,
             },
             {
                 "place_one_id": place_two.to_string(),
-                "place_two_id": place_one.to_string()
+                "place_two_id": place_one.to_string(),
+                "universe_id": universe_id,
             }
         ]
     };
-    db_client.database(universe_id.to_string().as_str())
+    db_client.database(VERSEENGINE_DB_NAME)
         .collection::<Road>(ROADS_COLLECTION_NAME)
         .find_one(filter)
         .await
@@ -95,12 +95,12 @@ pub async fn count_non_secret_roads_for_place(universe_id: ObjectId, place_id: u
     let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await;
     let filter = doc! {
         "$or": [
-            { "place_one_id": place_id.to_string() },
-            { "place_two_id": place_id.to_string() }
+            { "place_one_id": place_id.to_string(), "universe_id": universe_id },
+            { "place_two_id": place_id.to_string(), "universe_id": universe_id },
         ],
         "secret": false
     };
-    db_client.database(universe_id.to_string().as_str())
+    db_client.database(VERSEENGINE_DB_NAME)
         .collection::<Road>(ROADS_COLLECTION_NAME)
         .count_documents(filter)
         .await

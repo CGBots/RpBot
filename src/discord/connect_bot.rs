@@ -18,6 +18,7 @@ use crate::discord::handler::Handler;
 use crate::ping_command::handler::ping;
 use crate::start_command::handler::start;
 use crate::discord::poise_structs::Data;
+use crate::tip::support_command::support_command;
 use crate::universe::universe;
 use crate::travel::travel__sub_command::travel;
 
@@ -88,7 +89,7 @@ pub async fn connect_bot() -> Result<Client, ()>{
     tracing_subscriber::fmt::init();
     
     
-    let mut commands= vec![ping(), universe(), start(), place(), road(), character(), travel()];
+    let mut commands= vec![ping(), universe(), start(), place(), road(), character(), travel(), support_command()];
     
     
     let translations = translation::read_ftl().expect("failed to read translation files");

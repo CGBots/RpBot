@@ -524,20 +524,24 @@ impl Server {
 
     pub async fn get_player_move(self, user_id: u64) -> mongodb::error::Result<Option<PlayerMove>> {
         let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }).await;
-        let filter = doc!{"user_id": user_id.to_string().as_str()};
-        db_client.database(self.universe_id.to_string().as_str()).collection::<PlayerMove>(TRAVELS_COLLECTION_NAME).find_one(filter).await
+        let filter = doc!{"user_id": user_id.to_string().as_str(), "universe_id": self.universe_id};
+        db_client
+            .database(VERSEENGINE_DB_NAME)
+            .collection::<PlayerMove>(TRAVELS_COLLECTION_NAME)
+            .find_one(filter)
+            .await
     }
 
     pub async fn get_roads(self, place_id: u64) -> Result<Vec<Road>, mongodb::error::Error> {
         let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }).await;
         let filter = doc!{
             "$or": [
-                doc!{"place_one_id": place_id.to_string()},
-                doc!{"place_two_id": place_id.to_string()}
+                doc!{"place_one_id": place_id.to_string(), "universe_id": self.universe_id},
+                doc!{"place_two_id": place_id.to_string(), "universe_id": self.universe_id},
             ]
 
         };
-        let cursor = db_client.database(self.universe_id.to_string().as_str())
+        let cursor = db_client.database(VERSEENGINE_DB_NAME)
             .collection::<Road>(ROADS_COLLECTION_NAME)
             .find(filter)
             .await;
@@ -558,8 +562,7 @@ pub async fn get_server_by_id(
     server_id: u64,
 ) -> mongodb::error::Result<Option<Server>> {
     let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
-    let filter = doc! { "server_id": server_id.to_string() };
-    println!("Querying server with ID: {} using filter: {:?}", server_id, filter);
+    let filter = doc! {"server_id": server_id.to_string()};
     db_client
         .database(VERSEENGINE_DB_NAME)
         .collection::<Server>(SERVERS_COLLECTION_NAME)

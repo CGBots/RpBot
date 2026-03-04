@@ -1,6 +1,10 @@
 use futures::TryStreamExt;
 use crate::database::db_client::{DB_CLIENT, connect_db};
-use crate::database::db_namespace::{CHARACTERS_COLLECTION_NAME, TRAVELS_COLLECTION_NAME, VERSEENGINE_DB_NAME, SERVERS_COLLECTION_NAME, STATS_COLLECTION_NAME, UNIVERSES_COLLECTION_NAME};
+use crate::database::db_namespace::{
+    CHARACTERS_COLLECTION_NAME, TRAVELS_COLLECTION_NAME, VERSEENGINE_DB_NAME,
+    SERVERS_COLLECTION_NAME, STATS_COLLECTION_NAME, UNIVERSES_COLLECTION_NAME,
+    PLACES_COLLECTION_NAME, ROADS_COLLECTION_NAME
+};
 use mongodb::bson::{doc, from_document, Document};
 use mongodb::bson::oid::ObjectId;
 use mongodb::{Cursor, IndexModel};
@@ -10,6 +14,8 @@ use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use tokio::join;
 use crate::database::characters::Character;
+use crate::database::places::Place;
+use crate::database::road::Road;
 use crate::database::server::{Server};
 use crate::database::stats::Stat;
 use crate::database::travel::PlayerMove;
@@ -209,9 +215,17 @@ impl Universe {
             .database(VERSEENGINE_DB_NAME)
             .collection::<Universe>(UNIVERSES_COLLECTION_NAME)
             .count_documents(filter)
-            .await?;
+            .await;
 
-        Ok(result <= FREE_LIMIT_UNIVERSE as u64)
+        println!("{:?}", result); //got Ok(0)
+
+        match result {
+            Ok(count) => Ok(count < FREE_LIMIT_UNIVERSE as u64),
+            Err(e) => {
+                log::error!("Error counting universes for user {}: {}", user_id, e);
+                Err(e.into())
+            }
+        }
     }
 
     /// Asynchronously adds a server to the universe in the database.
@@ -392,25 +406,40 @@ impl Universe {
     /// - The function assumes that `self.universe_id` is correctly set and corresponds to a valid universe.
     pub async fn delete(&self) -> Result<&str, Error> {
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
-        let filter_universe = doc! { "_id": self.universe_id};
-        let filter_server = doc!{"universe_id": self.universe_id};
+        let db = db_client.database(VERSEENGINE_DB_NAME);
+        let filter = doc! {"universe_id": self.universe_id};
 
-        let drop_db = db_client
-            .database(self.universe_id.to_string().as_str());
+        let universes = db.collection::<Universe>(UNIVERSES_COLLECTION_NAME);
+        let servers = db.collection::<Server>(SERVERS_COLLECTION_NAME);
+        let places = db.collection::<Place>(PLACES_COLLECTION_NAME);
+        let stats = db.collection::<Stat>(STATS_COLLECTION_NAME);
+        let roads = db.collection::<Road>(ROADS_COLLECTION_NAME);
+        let characters = db.collection::<Character>(CHARACTERS_COLLECTION_NAME);
+        let travels = db.collection::<PlayerMove>(TRAVELS_COLLECTION_NAME);
 
-        let delete_universe = db_client
-            .database(VERSEENGINE_DB_NAME)
-            .collection::<Universe>(UNIVERSES_COLLECTION_NAME);
+        let universe_delete = universes.delete_one(doc! {"_id": self.universe_id});
+        let servers_delete = servers.delete_many(filter.clone());
+        let places_delete = places.delete_many(filter.clone());
+        let stats_delete = stats.delete_many(filter.clone());
+        let roads_delete = roads.delete_many(filter.clone());
+        let characters_delete = characters.delete_many(filter.clone());
+        let travels_delete = travels.delete_many(filter);
 
-        let delete_servers = db_client
-            .database(VERSEENGINE_DB_NAME)
-            .collection::<Server>(SERVERS_COLLECTION_NAME)
-            ;
+        let (universe_res, servers_res, places_res, stats_res, roads_res, characters_res, travels_res) = join!(
+            universe_delete,
+            servers_delete,
+            places_delete,
+            stats_delete,
+            roads_delete,
+            characters_delete,
+            travels_delete
+        );
 
-        let (db_drop_result, universe_delete, server_delete) = join!(drop_db.drop(), delete_universe.delete_one(filter_universe), delete_servers.delete_one(filter_server));
-        if db_drop_result.is_err() || universe_delete.is_err() || server_delete.is_err(){
+        if universe_res.is_err() || servers_res.is_err() || places_res.is_err() || stats_res.is_err() 
+            || roads_res.is_err() || characters_res.is_err() || travels_res.is_err() {
             return Err("universe_delete__failed".into());
         }
+
         Ok("universe_delete__passed")
     }
     
@@ -447,14 +476,14 @@ impl Universe {
     ///   across the collection.
     pub async fn setup_constraints(&self) -> mongodb::error::Result<CreateIndexResult> {
         let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }) .await .clone();
-        let index_keys = doc! {"name": 1};
+        let index_keys = doc! {"name": 1, "universe_id": 1};
         let index_options = IndexOptions::builder().unique(true).build();
         let index_model = IndexModel::builder()
             .keys(index_keys)
             .options(index_options)
             .build();
         db_client
-            .database(self.universe_id.to_string().as_str())
+            .database(VERSEENGINE_DB_NAME)
             .collection::<Stat>(STATS_COLLECTION_NAME)
             .create_index(index_model)
             .await
@@ -511,21 +540,17 @@ impl Universe {
 
         match servers_result_request {
             Ok(server_count) => {
-                if server_count >= FREE_LIMIT_UNIVERSE as u64 {
-                    return Ok(false)
-                }
+                Ok(server_count < FREE_LIMIT_SERVERS_PER_UNIVERSE as u64)
             }
-            Err(_) => { return Err("universe__check_server_limit_failed".into()) }
+            Err(e) => { println!("{:?}", e); return Err("universe__check_server_limit_failed".into()) }
         }
-
-        Ok(true)
     }
 
     pub async fn get_stats(self) -> mongodb::error::Result<Cursor<Stat>> {
         let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
         let filter = doc!{"universe_id": self.universe_id};
         db_client
-            .database(self.universe_id.to_string().as_str())
+            .database(VERSEENGINE_DB_NAME)
             .collection::<Stat>(STATS_COLLECTION_NAME)
             .find(filter)
             .await
@@ -533,9 +558,9 @@ impl Universe {
 
     pub async fn get_player_by_user_id(self, user_id: u64) -> mongodb::error::Result<Option<Character>> {
         let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }) .await .clone();
-        let filter = doc!{"user_id": user_id.to_string()};
+        let filter = doc!{"user_id": user_id.to_string(), "universe_id": self.universe_id};
         db_client
-            .database(self.universe_id.to_string().as_str())
+            .database(VERSEENGINE_DB_NAME)
             .collection::<Character>(CHARACTERS_COLLECTION_NAME)
             .find_one(filter)
             .await
@@ -821,8 +846,7 @@ mod test {
             .unwrap()
             .inserted_id
             .as_object_id()
-            .unwrap()
-            .to_hex();
+            .unwrap();
         let result = get_universe_by_id(id).await;
         println!("{:?}", result);
         delete_previously_setup().await;
