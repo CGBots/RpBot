@@ -511,7 +511,7 @@ move_from_place__road_not_found = Aucune route trouvée
 
 travel__moving_to_place = `{$user} se déplace vers {$destination}.`
 travel__reached_destination = `{$user} est arrivé à {$destination}.`
-travel__arrived_at_destination = `{$user} viens d'arriver.`
+travel__arrived_at_destination = `{$user} vient d'arriver.`
 travel__invitation = Frontière atteinte
     .title = Frontière atteinte
     .message = **_{$user}, tu arrive à la frontière d'une région de l'univers {$universe} ! Voici l'invitation pour continuer ton voyage : {$link} _**

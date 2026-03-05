@@ -54,7 +54,5 @@ async fn main() {
     }).await;
 
     constraint().await;
-    let _ = crate::travel::logic::setup().await;
-    let _ = crate::universe::time::setup_universal_time().await;
     let _ = connect_bot().await;
 }

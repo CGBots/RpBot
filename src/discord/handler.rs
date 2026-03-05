@@ -81,6 +81,13 @@ impl EventHandler for Handler {
         }
     }
 
+    #[cfg(not(test))]
+    async fn ready(&self, _ctx: Context, ready: Ready) {
+        println!("{} is connected!", ready.user.name);
+        let _ = crate::travel::logic::setup().await;
+        let _ = crate::universe::time::setup_universal_time().await;
+    }
+
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         match interaction.message_component(){
             None => {}

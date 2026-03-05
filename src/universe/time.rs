@@ -6,6 +6,7 @@ use tokio::task::JoinHandle;
 use chrono::{Utc};
 use std::sync::Arc;
 use mongodb::bson::oid::ObjectId;
+use serenity::builder::CreateEmbed;
 use crate::database::universe::Universe;
 use crate::tr_locale;
 use crate::travel::logic::HTTP_CLIENT;
@@ -225,7 +226,7 @@ async fn process_universe_phase_change(universe_id: mongodb::bson::oid::ObjectId
                                 if let Some(index) = bot_message_index {
                                     let mut bot_message = messages.remove(index);
                                     // Modifier le message existant
-                                    if let Err(_) = bot_message.edit(&http_clone, serenity::all::EditMessage::new().content(msg.clone())).await {
+                                    if let Err(_) = bot_message.edit(&http_clone, serenity::all::EditMessage::new().content(msg.clone()).suppress_embeds(true)).await {
                                         // Si la modification échoue (ex: message supprimé), on en envoie un nouveau
                                         let _ = channel.send_message(&http_clone, CreateMessage::new().content(msg)).await;
                                     }

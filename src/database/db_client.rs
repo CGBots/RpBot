@@ -60,7 +60,22 @@ pub async fn connect_db() -> Result<mongodb::Client, mongodb::error::Error>{
     let port = env::var("MONGODB_PORT").unwrap_or_else(|_| "27017".to_string());
     let auth_source = env::var("MONGODB_AUTH_SOURCE").unwrap_or_else(|_| "admin".to_string());
     let url = format!("mongodb://{user}:{password}@{host}:{port}/?authSource={auth_source}");
-    mongodb::Client::with_uri_str(url).await
+    println!("Connecting to MongoDB at {host}:{port} with authSource={auth_source}...");
+    match mongodb::Client::with_uri_str(&url).await {
+        Ok(client) => {
+            // Vérifier la connexion en listant les collections pour être sûr qu'on y accède vraiment
+            if let Err(e) = client.database(VERSEENGINE_DB_NAME).list_collection_names().await {
+                eprintln!("Failed to ping MongoDB: {:?}", e);
+                return Err(e);
+            }
+            println!("Connected to MongoDB successfully!");
+            Ok(client)
+        }
+        Err(e) => {
+            eprintln!("Failed to create MongoDB client: {:?}", e);
+            Err(e)
+        }
+    }
 }
 
 /// Asynchronously sets a unique constraint on the `server_id` field in the specified collection.
