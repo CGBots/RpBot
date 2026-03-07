@@ -1,9 +1,9 @@
 use log::log;
 use poise::CreateReply;
-use serenity::all::{Color, CreateEmbed, CreateEmbedFooter};
+use serenity::all::{CreateEmbed, CreateEmbedFooter};
 use crate::discord::poise_structs::{Context, Error};
 
-#[poise::command(slash_command)]
+#[poise::command(slash_command, rename = "support_command")]
 pub async fn support_command(ctx: Context<'_>) -> Result<(), Error>{
     match ctx.send(CreateReply::default()
         .content(format!("## {}\n{}", crate::translation::get(ctx, "tips", Some("title"), None), crate::translation::get(ctx, "tips", Some("message"), None)))

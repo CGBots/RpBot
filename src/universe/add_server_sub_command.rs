@@ -12,8 +12,12 @@ use crate::database::server::Server;
 use crate::universe::setup::setup_sub_command::{SetupType, _setup};
 use crate::utility::reply::reply;
 
-#[poise::command(slash_command, required_permissions = "ADMINISTRATOR", guild_only)]
-pub async fn add_server(ctx: Context<'_>, setup_type: SetupType) -> Result<(), Error> {
+#[poise::command(slash_command, required_permissions = "ADMINISTRATOR", guild_only, rename = "universe_add_server")]
+pub async fn add_server(
+    ctx: Context<'_>,
+    #[description = "universe_add_server.setup_type"]
+    setup_type: SetupType
+) -> Result<(), Error> {
     let Ok(_) = ctx.defer().await else { return Err("reply__reply_failed".into()) };
     let result = _add_server(&ctx, setup_type).await;
     let Ok(_) = reply(ctx, result).await else { return Err("reply__reply_failed".into()) };

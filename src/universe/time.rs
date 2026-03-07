@@ -6,7 +6,6 @@ use tokio::task::JoinHandle;
 use chrono::{Utc};
 use std::sync::Arc;
 use mongodb::bson::oid::ObjectId;
-use serenity::builder::CreateEmbed;
 use crate::database::universe::Universe;
 use crate::tr_locale;
 use crate::travel::logic::HTTP_CLIENT;

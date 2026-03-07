@@ -10,15 +10,6 @@ tips = Support the project
     .title = Support the project
     .message = Thanks to support the project ! You can do a tip at this page: https://ko-fi.com/cgbot
 
-support_command = support
-    .description = Give the link to support the project
-
-ping = ping
-    .description = allows you to ping the bot and get the send delay
-
-start = start
-    .description = Displays startup instructions in the current channel.
-
 start_message = Start Message
     .title = Thank you for using {botname}
     .description = To start using the bot, begin by creating a new universe.
@@ -31,6 +22,12 @@ start_message = Start Message
 stat_insert__failed = Failed to insert statistics
     .title = Failed to add stat
     .description = The stat could not be added.
+resolve_stat__character_not_found = Character not found during stat resolution
+    .title = Statistics error
+    .message = Unable to find the character to calculate their statistics.
+resolve_stat__database_error = Database error during stat resolution
+    .title = Statistics error
+    .message = A database error occurred while retrieving statistics.
 #Reply
 reply__reply_success = Success
     .title = Success
@@ -40,85 +37,69 @@ reply__reply_failed = Failed to send reply
     .description = The reply failed
 #Universe
 universe = universe
-    .description = universe
-check_universe_ownership__universe_not_found = Universe not found
-    .title = Universe not found
-    .mesage = The specified universe was not found
-universe_delete__failed = Failed to delete universe
-    .title = Deletion failed
-    .description = The universe could not be deleted.
-            Please try again or contact support if the problem persists: {support}
-universe_delete__passed = Universe successfully deleted
-    .title = Universe deleted
-    .description = The universe has been successfully deleted.
-universe__check_server_limit_failed = Failed to verify server limit
-    .title = Verification error
-    .message = Unable to verify the server limit for this universe
-            Please try again or contact support if the problem persists: {support}
-
-#Create universe
-create_universe = new_universe
+    .description = Universe management commands.
+universe_create_universe = new_universe
     .description = Allows you to create a new universe. A server can only be attached to one universe at a time.
     .universe_name = name
     .universe_name-description = Name of the new Universe
     .setup_type = setup_type
     .setup_type-description = Configuration type for this server
-create_universe__check_universe_limit_failed = Failed to verify universe limit
-    .title = Verification error
-    .message = Unable to verify the universe limit
-            Please try again or contact support if the problem persists: {support}
-create_universe__universe_limit_reached = Universe limit reached
-    .title = Limit reached
-    .message = You have reached the maximum number of allowed universes
-            Please try again or contact support if the problem persists: {support}
-create_universe__get_server_failed = Failed to retrieve server
-    .title = Server error
-    .message = Unable to retrieve server information
-            Please try again or contact support if the problem persists: {support}
-create_universe__already_exist_for_this_server = A universe already exists for this server
-    .title = Existing universe
-    .message = This server is already linked to a universe
-            Please try again or contact support if the problem persists: {support}
-create_universe__setup_constraints_failed = Failed to verify configuration constraints
-    .title = Constraints error
-    .message = Configuration constraints could not be verified
-            Please try again or contact support if the problem persists: {support}
-create_universe__server_insert_failed = Failed to insert server
-    .title = Insertion error
-    .message = Unable to insert the server into the database
-            Please try again or contact support if the problem persists: {support}
-create_universe__universe_insert_failed = Failed to insert universe
-    .title = Creation error
-    .message = Unable to create the universe in the database
-            Please try again or contact support if the problem persists: {support}
-create_universe__speed_stat_insert_failed = Failed to insert speed statistics
-    .title = Statistics error
-    .message = Unable to insert speed statistics
-            Please try again or contact support if the problem persists: {support}
-create_universe__universe_successfully_created = Universe successfully created
-    .title = Success
-    .message = Your new universe has been successfully created
-
-#Add server to universe
-add_server = add
-    .description = adds a server to the universe
+universe_add_server = add
+    .description = Adds this server to an existing universe.
     .setup_type = setup_type
     .setup_type-description = Configuration type for this server
-add_server_to_universe__already_bind = Server already linked to a universe
-    .title = Server already linked
-    .message = This server is already attached to a universe
-add_server_to_universe__universes_unavailable = No universe available
-    .title = Universes unavailable
-    .message = No universe is available for this server
-            Please try again or contact support if the problem persists: {support}
-choose_universe =
-    exceed_limit_number_of_servers_per_universe = Server limit per universe exceeded
-    .title = Limit exceeded
-    .message = The maximum number of servers for this universe has been reached.
-            If you need to go beyond this limit, please request it from support: {support}
-add_server_to_universe__guild_linked = Server linked to universe
-    .title = Server linked
-    .message = The server has been successfully linked to the universe
+universe_setup = setup
+    .description = Configure or reconfigure the current server for the universe it is linked to.
+    .setup_type = setup_type
+    .setup_type-description = Type of setup to perform (Full or Partial).
+universe_time = time
+    .description = Displays the current time of the universe.
+
+#Roads
+road = road
+    .description = Road management commands.
+road_create_road = create_road
+    .description = Creates a new road between two places.
+    .place_one = place_one
+    .place_one-description = First end of the road.
+    .place_two = place_two
+    .place_two-description = Second end of the road.
+    .distance = distance
+    .distance-description = Distance between the two places in kilometers.
+    .secret_channel = secret
+    .secret_channel-description = If true, the road will not be displayed on public maps.
+
+#Places
+place = place
+    .description = Place management commands.
+place_create_place = new_place
+    .description = Creates a new category corresponding to a city or interaction place.
+    .name = name
+    .name-description = Name of the place to create.
+
+#Characters
+character = character
+    .description = Character management commands.
+character_create_character = new_character
+    .description = Allows you to create your character in the universe. Only one character per player.
+
+#Travels
+travel = travel
+    .description = Allows you to move from one place to another.
+travel_start = start
+    .description = Starts a journey toward a destination.
+    .destination = destination
+    .destination-description = The place where you want to go (ID or mention).
+travel_stop = stop
+    .description = Stops your current journey on the road you are currently on.
+
+#Misc
+ping = ping
+    .description = Measures the bot's latency.
+support_command = support
+    .description = Displays information to support the project.
+start = start
+    .description = Displays startup instructions.
 
 #Server
 id__nothing_to_delete = Nothing to delete
@@ -222,6 +203,11 @@ setup__rp_character_channel_not_created = Character sheets channel not created
     .title = Creation error
     .message = Unable to create the character sheets channel
             Please try again or contact support if the problem persists: {support}
+universal_time_channel_name = Universal time
+setup__universal_time_channel_not_created = Universal time channel not created
+    .title = Creation error
+    .message = Unable to create the universal time channel
+            Please try again or contact support if the problem persists: {support}
 rp_wiki_channel_name = Wiki
 setup__wiki_channel_not_created = Wiki channel not created
     .title = Creation error
@@ -279,9 +265,6 @@ setup__setup_success_message = Setup completed successfully
 
 #create place
 create_placce = new_place
-    .description = Creates a category corresponding to a city, grouping multiple interaction locations
-    .name = name
-    .name-description = name of the place
 create_place__server_not_found = Unknown server
     .title = Unknown server
     .message = The server does not appear to be registered. Run /{$universe} {$add_server} [setup type]
@@ -306,15 +289,6 @@ create_place__success = Place created
 
 #Create road
 create_road = create_road
-    .description = Command to create a new road between 2 places
-    .place_one = place_one
-    .place_one-description = First end of the road
-    .place_two = place_two
-    .place_two-description = Second end of the road
-    .distance = distance
-    .distance-description = Distance between the two places in Km.
-    .secret = secret
-    .secret-description = Hide the road on maps (future functionnality) and wiki.
 create_road__server_not_found = Server not found
     .title = Server not found
     .message = The server does not appear to be registered. Run /{$universe} {$add_server} [setup type]
@@ -360,11 +334,21 @@ create_road__success = Road created
 create_road__limit_reached = Road limit reached
     .title = Limit reached
     .message = One of the places has already reached the maximum of 25 roads (excluding secret roads).
+create_road__already_exists = Road already exists
+    .title = Existing road
+    .message = A road already exists between these two places.
+create_road__universe_mismatch = Different universe
+    .title = Different universe
+    .message = Both places must belong to the same universe.
+create_road__invalid_place_one = Invalid first place ID
+    .title = Invalid first place
+    .message = The ID or mention of the first place is invalid. Use an ID or a mention <#id>.
+create_road__invalid_place_two = Invalid second place ID
+    .title = Invalid second place
+    .message = The ID or mention of the second place is invalid. Use an ID or a mention <#id>.
 
 #Create character
 create_character = new_character
-    .description = Command to create new character. Limited to 1 per player.
-
 character_modal_title = Create new character
 create_character__delete_character = Cancel
 create_character__submit_character = Submit
@@ -434,6 +418,12 @@ create_character__no_permission = Permission denied
 create_character__invalid_footer = Invalid interaction
     .title = Error
     .message = The interaction metadata is invalid.
+create_character__invalid_embed_title = Invalid embed title
+    .title = Error
+    .message = The character sheet title is invalid.
+create_character__message_not_found = Message not found
+    .title = Error
+    .message = The character sheet message could not be found.
 create_character__refused = Character refused
     .title = Character refused
     .message = The character has been refused by a moderator.
@@ -452,11 +442,10 @@ character_stat_input = Character's statistics
 accept_character__no_player_role_id = Server not configured
     .title = Server not configured
     .message = The {player_role_name} role hasn't been found.
+accept_character__member_not_found = Member not found during acceptance.
+    .title = Acceptance error
+    .message = Unable to find the user on the server.
 
-travel = travel
-    .description = Command to move from one place to another.
-    .destination = destination
-    .destination-description = The destination place (category ID or mention <#id>)
 travel__server_not_found = Server not found
     .title = Server not found
     .message = The server does not appear to be registered.
@@ -479,6 +468,8 @@ travel__source_place_not_found = Source place not found
     .title = Source place not found
     .message = Your current position is not recognized as a valid place.
 travel__started = Journey started
+travel__stopped = Journey stopped. You can now choose a destination or stay here.
+travel__not_in_move = You are not currently traveling.
     .title = Journey started
     .message = You have started your journey to {$destination}.
 travel__already_moving_to_destination = Already on the way
@@ -500,7 +491,6 @@ travel__invitation = Border reached
 
 # Universal Time
 time = time
-    .description = Displays the current time of the universe.
 universe_time__current_time = Universe Time
     .title = Universal Time
     .message = It is currently **{$time}** in this universe.

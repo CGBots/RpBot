@@ -5,8 +5,7 @@ use mongodb::bson::oid::ObjectId;
 use mongodb::results::InsertOneResult;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use serenity::all::{GuildChannel};
-use crate::database::db_client::{connect_db, DB_CLIENT};
+use crate::database::db_client::{get_db_client};
 use crate::database::db_namespace::{PLACES_COLLECTION_NAME, ROADS_COLLECTION_NAME, VERSEENGINE_DB_NAME};
 use crate::database::modifiers::Modifier;
 use crate::database::road::Road;
@@ -29,7 +28,7 @@ pub struct Place{
 
 impl Place{
     pub async fn insert_place(&self) -> mongodb::error::Result<InsertOneResult> {
-        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+        let db_client = get_db_client().await;
         db_client
             .database(VERSEENGINE_DB_NAME)
             .collection::<Place>(PLACES_COLLECTION_NAME)
@@ -48,7 +47,7 @@ impl Place{
                 }
             ]
         };
-        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+        let db_client = get_db_client().await;
         let cursor = db_client.database(VERSEENGINE_DB_NAME)
             .collection::<Road>(ROADS_COLLECTION_NAME)
             .find(filter)
@@ -58,7 +57,7 @@ impl Place{
 }
 
 pub async fn get_places_by_universe_id(universe_id: ObjectId) -> mongodb::error::Result<mongodb::Cursor<Place>> {
-    let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+    let db_client = get_db_client().await;
     db_client
         .database(VERSEENGINE_DB_NAME)
         .collection::<Place>(PLACES_COLLECTION_NAME)
@@ -72,7 +71,7 @@ pub async fn check_existing_place(universe_id: ObjectId, category_id: u64) -> mo
     let filter = doc!{"category_id": category_id.to_string(),
         "universe_id": universe_id,
     };
-    let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+    let db_client = get_db_client().await;
     db_client
         .database(VERSEENGINE_DB_NAME)
         .collection::<Place>(PLACES_COLLECTION_NAME)
@@ -82,7 +81,7 @@ pub async fn check_existing_place(universe_id: ObjectId, category_id: u64) -> mo
 
 pub async fn get_place_by_role_id(universe_id: ObjectId, role_id: u64) -> mongodb::error::Result<Option<Place>> {
     let filter = doc!{"role": role_id.to_string(), "universe_id": universe_id,};
-    let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+    let db_client = get_db_client().await;
     db_client
         .database(VERSEENGINE_DB_NAME)
         .collection::<Place>(PLACES_COLLECTION_NAME)
@@ -92,7 +91,7 @@ pub async fn get_place_by_role_id(universe_id: ObjectId, role_id: u64) -> mongod
 
 pub async fn get_place_by_category_id(universe_id: ObjectId, category_id: u64) -> mongodb::error::Result<Option<Place>> {
     let filter = doc!{"category_id": category_id.to_string(), "universe_id": universe_id,};
-    let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+    let db_client = get_db_client().await;
     db_client
         .database(VERSEENGINE_DB_NAME)
         .collection::<Place>(PLACES_COLLECTION_NAME)

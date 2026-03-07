@@ -5,14 +5,12 @@ use mongodb::results::{DeleteResult, InsertOneResult, UpdateResult};
 use serde::{Deserialize, Serialize};
 use serde_with::DisplayFromStr;
 use serde_with::serde_as;
-use crate::database::db_client::{connect_db, DB_CLIENT};
+use crate::database::db_client::{DB_CLIENT, get_db_client};
 use crate::database::db_namespace::{TRAVELS_COLLECTION_NAME, VERSEENGINE_DB_NAME};
 use crate::database::modifiers::Modifier;
 use crate::database::stats::{get_stat_by_name, StatValue, SPEED_STAT};
-use crate::database::universe::get_universe_by_id;
-use crate::travel::logic::MOVES;
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub enum SpaceType{
     Road,
     #[default]
@@ -57,7 +55,7 @@ pub struct PlayerMove{
 
 impl PlayerMove {
     pub async fn insert(self) -> mongodb::error::Result<InsertOneResult> {
-        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+        let db_client = get_db_client().await;
         let db = db_client.database(VERSEENGINE_DB_NAME);
         db.collection(TRAVELS_COLLECTION_NAME)
             .insert_one(self)
@@ -65,7 +63,7 @@ impl PlayerMove {
     }
 
     pub async fn remove(&self) -> Result<DeleteResult, mongodb::error::Error> {
-        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+        let db_client = get_db_client().await;
         let db = db_client.database(VERSEENGINE_DB_NAME);
         let filter = doc! {"user_id": self.user_id.to_string(), "universe_id":  self.universe_id};
         db.collection::<PlayerMove>(TRAVELS_COLLECTION_NAME)
@@ -80,7 +78,7 @@ impl PlayerMove {
         let update = doc! {"$set": doc};
         let options = mongodb::options::UpdateOptions::builder().upsert(true).build();
 
-        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+        let db_client = get_db_client().await;
         let db = db_client.database(VERSEENGINE_DB_NAME);
         db.collection::<PlayerMove>(TRAVELS_COLLECTION_NAME)
             .update_one(filter, update)
@@ -89,7 +87,7 @@ impl PlayerMove {
     }
 
     pub async fn get_active_moves(universe_id: ObjectId) -> mongodb::error::Result<Vec<PlayerMove>> {
-        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+        let db_client = get_db_client().await;
         let filter = doc! { "is_in_move": true, "universe_id":  universe_id };
         let mut cursor = db_client.database(VERSEENGINE_DB_NAME)
             .collection::<PlayerMove>(TRAVELS_COLLECTION_NAME)

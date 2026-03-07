@@ -41,11 +41,10 @@ use mongodb::bson::doc;
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use crate::database::db_client::{connect_db, DB_CLIENT};
-use crate::database::db_namespace::{CHARACTERS_COLLECTION_NAME, PLACES_COLLECTION_NAME, ROADS_COLLECTION_NAME, STATS_COLLECTION_NAME, VERSEENGINE_DB_NAME};
+use crate::database::db_client::{get_db_client};
+use crate::database::db_namespace::{CHARACTERS_COLLECTION_NAME, ROADS_COLLECTION_NAME, STATS_COLLECTION_NAME, VERSEENGINE_DB_NAME};
 use crate::database::modifiers::{Modifier, ModifierType};
 use crate::database::characters::Character;
-use crate::database::places::Place;
 use crate::database::road::Road;
 use crate::discord::poise_structs::Error;
 
@@ -243,7 +242,7 @@ impl Stat {
     /// If `DB_CLIENT` initialization fails or the database operation fails, the proper 
     /// error handling mechanism should be in place to avoid runtime panics.
     pub async fn insert_stat(&self) -> Result<Stat, Error>{
-        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+        let db_client = get_db_client().await;
         let result = db_client
             .database(VERSEENGINE_DB_NAME)
             .collection::<Stat>(STATS_COLLECTION_NAME)
@@ -293,7 +292,7 @@ impl Stat {
     /// - The database connection cannot be established.
     /// - The query execution fails.
     pub async fn get_stat_by_name(universe_id: &str, name: &str) -> mongodb::error::Result<Option<Stat>> {
-        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+        let db_client = get_db_client().await;
         let filter = doc! { "name": name, "universe_id": universe_id };
         db_client
             .database(VERSEENGINE_DB_NAME)
@@ -346,7 +345,7 @@ impl Stat {
     }
 
     pub async fn resolve(self, category_id: u64, user_id: u64) -> Result<(StatValue, Option<Modifier>), Error> {
-        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+        let db_client = get_db_client().await;
         let db = db_client.database(VERSEENGINE_DB_NAME);
 
         // 1. Recover stat in the universe (global)
@@ -485,7 +484,7 @@ impl Stat {
 }
 
 pub async fn get_stat_by_name(universe_id: ObjectId, name: &str) -> mongodb::error::Result<Option<Stat>> {
-    let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+    let db_client = get_db_client().await;
     db_client.database(VERSEENGINE_DB_NAME)
         .collection::<Stat>(STATS_COLLECTION_NAME)
         .find_one(doc! { "name": name, "universe_id":  universe_id })

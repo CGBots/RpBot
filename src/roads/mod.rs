@@ -3,7 +3,7 @@ use crate::discord::poise_structs::{Context, Error};
 
 pub mod create_road_sub_command;
 
-#[poise::command(slash_command, subcommands("create_road"), subcommand_required)]
+#[poise::command(slash_command, subcommands("create_road"), subcommand_required, rename = "road")]
 pub async fn road(ctx: Context<'_>) -> Result<(), Error>{
     Ok(())
 }

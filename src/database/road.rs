@@ -5,7 +5,7 @@ use mongodb::Cursor;
 use mongodb::results::InsertOneResult;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use crate::database::db_client::{connect_db, DB_CLIENT};
+use crate::database::db_client::{get_db_client};
 use crate::database::db_namespace::{ROADS_COLLECTION_NAME, VERSEENGINE_DB_NAME};
 use crate::database::modifiers::Modifier;
 
@@ -35,7 +35,7 @@ pub struct Road{
 
 impl Road{
     pub async fn insert(self) -> mongodb::error::Result<InsertOneResult> {
-        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+        let db_client = get_db_client().await;
         db_client
             .database(VERSEENGINE_DB_NAME)
             .collection::<Road>(ROADS_COLLECTION_NAME)
@@ -46,7 +46,7 @@ impl Road{
 
 pub async fn get_road_by_channel_id(universe_id: ObjectId, channel_id: u64) -> mongodb::error::Result<Option<Road>> {
     let filter = doc!{"channel_id": channel_id.to_string().as_str(), "universe_id": universe_id};
-    let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+    let db_client = get_db_client().await;
     db_client
         .database(VERSEENGINE_DB_NAME)
         .collection::<Road>(ROADS_COLLECTION_NAME)
@@ -55,7 +55,7 @@ pub async fn get_road_by_channel_id(universe_id: ObjectId, channel_id: u64) -> m
 }
 
 pub async fn get_road_by_source(universe_id: ObjectId, destination_id: u64) -> mongodb::error::Result<Cursor<Road>> {
-    let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }).await;
+    let db_client = get_db_client().await;
     let filter = doc! {
         "$or": [
             { "place_one_id": destination_id.to_string(), "universe_id": universe_id },
@@ -70,7 +70,7 @@ pub async fn get_road_by_source(universe_id: ObjectId, destination_id: u64) -> m
 }
 
 pub async fn get_road(universe_id: ObjectId, place_one: u64, place_two: u64) -> mongodb::error::Result<Option<Road>> {
-    let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }).await;
+    let db_client = get_db_client().await;
     let filter = doc! {
         "$or": [
             {
@@ -92,7 +92,7 @@ pub async fn get_road(universe_id: ObjectId, place_one: u64, place_two: u64) -> 
 }
 
 pub async fn count_non_secret_roads_for_place(universe_id: ObjectId, place_id: u64) -> mongodb::error::Result<u64> {
-    let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await;
+    let db_client = get_db_client().await;
     let filter = doc! {
         "$or": [
             { "place_one_id": place_id.to_string(), "universe_id": universe_id },

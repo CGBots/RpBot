@@ -20,7 +20,7 @@ use crate::discord::poise_structs::*;
 /// User: /ping
 /// Bot: Pong! 123ms
 /// ```
-#[poise::command(slash_command)]
+#[poise::command(slash_command, rename = "ping")]
 pub async fn ping(
     ctx: Context<'_>
 ) -> Result<(), Error> {

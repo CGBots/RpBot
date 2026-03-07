@@ -10,14 +10,6 @@ tips = Soutient le projet
     .title = Soutient le projet
     .message = Merci de vouloir supporter le projet ! Tu peux faire le don au montant que tu souhaite à cette page: https://ko-fi.com/cgbot
 
-support_command = supporter
-    .description = Affiche le lien pour faire un don et supporter le projet.
-
-ping = ping
-    .description = permet de ping le bot et d'avoir le délai d'envoi
-    
-start = start
-    .description = Affiche les instruction de démarrage dans le salon actuel.
 start_message = Start Message
     .title = Merci d'utiliser {botname}
     .description = Pour commencer à utiliser le bot, commencez par créer un nouvel univers.
@@ -30,6 +22,12 @@ start_message = Start Message
 stat_insert__failed = Échec de l'insertion des statistiques
     .title = Ajout de la stat échouée
     .description = La stat n'as pas pu être ajouté.
+resolve_stat__character_not_found = Personnage non trouvé lors de la résolution de la stat
+    .title = Erreur de statistique
+    .message = Impossible de trouver le personnage pour calculer ses statistiques.
+resolve_stat__database_error = Erreur de base de données lors de la résolution de la stat
+    .title = Erreur de statistique
+    .message = Une erreur de base de données s'est produite lors de la récupération des statistiques.
 #Reply
 reply__reply_success = Succès
     .title = Succès
@@ -39,85 +37,69 @@ reply__reply_failed = Échec de l'envoi de la réponse
     .description = La réponse à échouée
 #Universe
 universe = univers
-    .description = univers
-check_universe_ownership__universe_not_found = Univers introuvable
-    .title = Univers introuvable
-    .mesage = L'univers spécifié n'a pas été trouvé
-universe_delete__failed = Échec de la suppression de l'univers
-    .title = Echec de suppression
-    .description = L'univers n'as pas pû être supprimé.
-            Veuillez ressayer ou contacter le support si le problème persiste: {support}
-universe_delete__passed = Univers supprimé avec succès
-    .title = Univers supprimé
-    .description = L'univers à bien été supprimé.
-universe__check_server_limit_failed = Échec de la vérification de la limite de serveurs
-    .title = Erreur de vérification
-    .message = Impossible de vérifier la limite de serveurs pour cet univers
-            Veuillez ressayer ou contacter le support si le problème persiste: {support}
-
-#Create universe
-create_universe = nouvel_univers
+    .description = Commandes de gestion de l'univers.
+universe_create_universe = nouvel_univers
     .description = Permet de créer un nouvel univers. Un serveur ne peut être rattaché qu'à un univers à la fois.
     .universe_name = nom
     .universe_name-description = Nom du nouvel Univers
     .setup_type = type_de_setup
     .setup_type-description = Type de configuration pour ce serveur
-create_universe__check_universe_limit_failed = Échec de la vérification de la limite d'univers
-    .title = Erreur de vérification
-    .message = Impossible de vérifier la limite d'univers
-            Veuillez ressayer ou contacter le support si le problème persiste: {support}
-create_universe__universe_limit_reached = Limite d'univers atteinte
-    .title = Limite atteinte
-    .message = Vous avez atteint le nombre maximum d'univers autorisés
-            Veuillez ressayer ou contacter le support si le problème persiste: {support}
-create_universe__get_server_failed = Échec de la récupération du serveur
-    .title = Erreur serveur
-    .message = Impossible de récupérer les informations du serveur
-            Veuillez ressayer ou contacter le support si le problème persiste: {support}
-create_universe__already_exist_for_this_server = Un univers existe déjà pour ce serveur
-    .title = Univers existant
-    .message = Ce serveur est déjà lié à un univers
-            Veuillez ressayer ou contacter le support si le problème persiste: {support}
-create_universe__setup_constraints_failed = Échec de la vérification des contraintes de configuration
-    .title = Erreur de contraintes
-    .message = Les contraintes de configuration n'ont pas pu être vérifiées
-            Veuillez ressayer ou contacter le support si le problème persiste: {support}
-create_universe__server_insert_failed = Échec de l'insertion du serveur
-    .title = Erreur d'insertion
-    .message = Impossible d'insérer le serveur dans la base de données
-            Veuillez ressayer ou contacter le support si le problème persiste: {support}
-create_universe__universe_insert_failed = Échec de l'insertion de l'univers
-    .title = Erreur de création
-    .message = Impossible de créer l'univers dans la base de données
-            Veuillez ressayer ou contacter le support si le problème persiste: {support}
-create_universe__speed_stat_insert_failed = Échec de l'insertion des statistiques de vitesse
-    .title = Erreur de statistiques
-    .message = Impossible d'insérer les statistiques de vitesse
-            Veuillez ressayer ou contacter le support si le problème persiste: {support}
-create_universe__universe_successfully_created = Univers créé avec succès
-    .title = Succès
-    .message = Votre nouvel univers a été créé avec succès
-
-#Add server to universe
-add_server = ajouter
-    .description = ajoute un serveur à l'univers
-    .setup_type = setup_type
+universe_add_server = ajouter
+    .description = Ajoute ce serveur à un univers existant.
+    .setup_type = type_de_setup
     .setup_type-description = Type de configuration pour ce serveur
-add_server_to_universe__already_bind = Serveur déjà lié à un univers
-    .title = Serveur déjà lié
-    .message = Ce serveur est déjà rattaché à un univers
-add_server_to_universe__universes_unavailable = Aucun univers disponible
-    .title = Univers indisponibles
-    .message = Aucun univers n'est disponible pour ce serveur
-            Veuillez ressayer ou contacter le support si le problème persiste: {support}
-choose_universe =
-    exceed_limit_number_of_servers_per_universe = Limite de serveurs par univers dépassée
-    .title = Limite dépassée
-    .message = Le nombre maximum de serveurs pour cet univers a été atteint.
-            Si vous avez besoin d'aller au delà de cette limite, merci d'en faire la demande au support: {support}
-add_server_to_universe__guild_linked = Serveur lié à l'univers
-    .title = Serveur lié
-    .message = Le serveur a été lié à l'univers avec succès
+universe_setup = configuration
+    .description = Configure ou reconfigure le serveur actuel pour l'univers auquel il est lié.
+    .setup_type = type_de_setup
+    .setup_type-description = Type de configuration à effectuer (Complet ou Partiel).
+universe_time = temps
+    .description = Affiche l'heure actuelle de l'univers.
+
+#Roads
+road = route
+    .description = Commandes de gestion des routes.
+road_create_road = nouvelle_route
+    .description = Crée une nouvelle route entre deux lieux.
+    .place_one = lieu_un
+    .place_one-description = Première extrémité de la route.
+    .place_two = lieu_deux
+    .place_two-description = Seconde extrémité de la route.
+    .distance = distance
+    .distance-description = Distance entre les deux lieux en kilomètres.
+    .secret_channel = secret
+    .secret_channel-description = Si vrai, la route ne sera pas affichée sur les cartes publiques.
+
+#Places
+place = lieu
+    .description = Commandes de gestion des lieux.
+place_create_place = nouvel_endroit
+    .description = Crée une nouvelle catégorie correspondant à une ville ou un lieu d'interaction.
+    .name = nom
+    .name-description = Nom du lieu à créer.
+
+#Characters
+character = personnage
+    .description = Commandes de gestion des personnages.
+character_create_character = nouveau_personnage
+    .description = Permet de créer votre personnage dans l'univers. Un seul personnage par joueur.
+
+#Travels
+travel = voyage
+    .description = Permet de se déplacer d'un lieu à un autre.
+travel_start = départ
+    .description = Commence un voyage vers une destination.
+    .destination = destination
+    .destination-description = Le lieu où vous souhaitez vous rendre (ID ou mention).
+travel_stop = stop
+    .description = Arrête votre voyage actuel sur la route où vous vous trouvez.
+
+#Misc
+ping = ping
+    .description = Mesure la latence du bot.
+support_command = supporter
+    .description = Affiche les informations pour soutenir le projet.
+start = start
+    .description = Affiche les instructions de démarrage.
 
 #Server
 id__nothing_to_delete = Rien à supprimer
@@ -283,9 +265,6 @@ setup__setup_success_message = Configuration terminée avec succès
 
 #create place
 create_placce = nouvel_endroit
-    .description = Créé une catégorie correpondant à une ville, regrouppant plusieurs lieux d'interaction
-    .name = nom
-    .name-description = nom du lieu
 create_place__server_not_found = Serveur inconnu
     .title = Server inconnu
     .message = Le serveur semble ne pas être enregistré. Faites /{$universe} {$add_server} [type de setup]
@@ -310,15 +289,6 @@ create_place__success = Place créée
 
 #Create road
 create_road = nouvelle_route
-    .description = Commande pour créer une nouvelle route entre 2 lieux
-    .place_one = lieu_un
-    .place_one-description = Première extrémité de la route
-    .place_two = lieu_deux
-    .place_two-description = Seconde extrémité de la route
-    .distance = distance
-    .distance-description = Distance séparant les deux lieux en Km.
-    .secret = secret
-    .secret-description = Permet de cacher la route des cartes (fonctionnalité à venir) et du wiki.
 create_road__server_not_found = Serveur introuvable
     .title = Serveur introuvable
     .message = Le serveur ne semble pas être enregistré. Faites /{$universe} {$add_server} [type de setup]
@@ -379,8 +349,6 @@ create_road__universe_mismatch = Univers différent
 
 #Create character
 create_character = nouveau_personnage
-    .description = Commande pour créer un nouveau personnage. Limité à 1 par joueur.
-
 character_modal_title = Créer un nouveau personnage
 create_character__delete_character = Annuler
 create_character__submit_character = Envoyer
@@ -450,6 +418,12 @@ create_character__no_permission = Permission refusée
 create_character__invalid_footer = Interaction invalide
     .title = Erreur
     .message = Les métadonnées de l'interaction sont invalides.
+create_character__invalid_embed_title = Titre d'embed invalide
+    .title = Erreur
+    .message = Le titre de la fiche de personnage est invalide.
+create_character__message_not_found = Message introuvable
+    .title = Erreur
+    .message = Le message de la fiche de personnage n'a pas pu être trouvé.
 create_character__refused = Personnage refusé
     .title = Personnage refusé
     .message = Le personnage a été refusé par un modérateur.
@@ -468,13 +442,12 @@ character_stat_input = Statistiques du personnage
 accept_character__no_player_role_id = Serveur non setup
     .title = Serveur non setup
     .message = Le role {player_role_name} n'as pas été trouvé.
+accept_character__member_not_found = Membre introuvable lors de l'acceptation.
+    .title = Erreur d'acceptation
+    .message = Impossible de trouver l'utilisateur sur le serveur.
 
 
 #Travels
-travel = voyage
-    .description = Commande pour se déplacer d'un lieu à un autre.
-    .destination = destination
-    .destination-description = Le lieu de destination (ID de catégorie ou mention <#id>)
 travel__server_not_found = Serveur introuvable
     .title = Serveur introuvable
     .message = Le serveur ne semble pas être enregistré.
@@ -497,6 +470,8 @@ travel__source_place_not_found = Lieu d'origine introuvable
     .title = Lieu d'origine introuvable
     .message = Votre position actuelle n'est pas reconnue comme un lieu valide.
 travel__started = Voyage commencé
+travel__stopped = Voyage arrêté. Vous pouvez maintenant choisir une destination ou rester ici.
+travel__not_in_move = Vous n'êtes pas en train de voyager.
     .title = Voyage commencé
     .message = Vous avez commencé votre voyage vers {$destination}.
 travel__already_moving_to_destination = Déjà en route
@@ -518,7 +493,6 @@ travel__invitation = Frontière atteinte
 
 # Temps Universel
 time = temps
-    .description = Affiche l'heure actuelle de l'univers.
 universe_time__current_time = Heure de l'univers
     .title = Temps Universel
     .message = Il est actuellement **{$time}** dans cet univers.

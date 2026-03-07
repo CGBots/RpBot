@@ -10,14 +10,12 @@ use crate::database::travel::{PlayerMove, SpaceType};
 use crate::database::characters::Character;
 use chrono::{Local, Timelike, Utc};
 use fluent::FluentArgs;
-use fluent_syntax::parser::Slice;
-use log::log;
 use tokio::time::sleep;
 use crate::database::road::get_road_by_channel_id;
-use crate::database::stats::{get_stat_by_name, Stat, SPEED_STAT};
+use crate::database::stats::{get_stat_by_name, SPEED_STAT};
 use crate::database::universe::get_universe_by_id;
 use crate::tr_locale;
-use crate::translation::{get_by_locale, Translations};
+use crate::translation::{get_by_locale};
 
 pub static MOVES: Lazy<Arc<Mutex<Vec<PlayerMove>>>> = Lazy::new(|| Arc::new(Mutex::new(vec![])));
 pub static SLEEPER: Lazy<Arc<Mutex<Option<JoinHandle<()>>>>> = Lazy::new(|| Arc::new(Mutex::new(None)));
@@ -834,4 +832,44 @@ pub async fn add_travel(http: Arc<Http>, guild_id: u64, mut player_move: PlayerM
 
 pub async fn remove_travel(user_id: u64) {
     remove_move(user_id).await;
+}
+
+pub fn calculate_current_distance(player_move: &PlayerMove) -> f64 {
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+    let start_ts = player_move.step_start_timestamp.unwrap_or(now);
+    let end_ts = player_move.step_end_timestamp.unwrap_or(now);
+    
+    // Si on est déjà après la fin du step, on est censé avoir parcouru toute la distance du step
+    let effective_now = now.min(end_ts);
+    let elapsed_secs = (effective_now.saturating_sub(start_ts)) as f64;
+    let speed_kmh = player_move.modified_speed;
+    
+    let step_distance = (elapsed_secs / 3600.0) * speed_kmh;
+    player_move.distance_traveled + step_distance
+}
+
+pub async fn stop_travel(user_id: u64) -> Result<PlayerMove, anyhow::Error> {
+    let mut moves_lock = MOVES.lock().await;
+    let index = moves_lock.iter().position(|m| m.user_id == user_id);
+    
+    let mut player_move = if let Some(idx) = index {
+        moves_lock[idx].clone()
+    } else {
+        bail!("No active move found for user {}", user_id);
+    };
+
+    // Calculer la distance actuelle avant de l'arrêter
+    player_move.distance_traveled = calculate_current_distance(&player_move);
+    player_move.is_in_move = false;
+    player_move.step_start_timestamp = None;
+    player_move.step_end_timestamp = None;
+    
+    // Sauvegarder en DB
+    player_move.upsert().await.map_err(|e| anyhow::anyhow!("DB error: {:?}", e))?;
+    
+    // Relâcher le lock avant d'appeler remove_move pour éviter les deadlocks
+    drop(moves_lock);
+    remove_move(user_id).await;
+    
+    Ok(player_move)
 }

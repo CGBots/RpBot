@@ -1,20 +1,14 @@
-use std::sync::mpsc::channel;
 use poise::serenity_prelude::Context as SerenityContext;
-use serenity::all::{GuildChannel, ChannelId, CreateMessage, CreateActionRow, EditMessage, Color, CreateSelectMenuOption, ComponentInteraction, Interaction};
-use crate::database::places::{get_place_by_category_id, Place};
+use serenity::all::{CreateActionRow, EditMessage, Color, CreateSelectMenuOption, ComponentInteraction, Interaction};
+use crate::database::places::{get_place_by_category_id,};
 use crate::database::server::{get_server_by_id, Server};
 use crate::database::travel::{PlayerMove, SpaceType};
-use crate::database::characters::Character;
 use crate::discord::poise_structs::{Context, Error};
-use crate::travel::logic::add_travel;
+use crate::travel::logic::{add_travel, stop_travel};
 use crate::utility::reply::{reply, reply_with_args};
-use fluent::FluentArgs;
-use fluent::types::AnyEq;
-use futures::{StreamExt, TryStreamExt};
-use poise::{CreateReply, ReplyHandle};
-use crate::characters::create_character_sub_command::ACCEPT_CHARACTER_CHOOSE_PLACE;
-use crate::database::road::{get_road_by_source, Road};
-use crate::tr_locale;
+use futures::{TryStreamExt};
+use poise::{CreateReply};
+use crate::database::road::{get_road, get_road_by_channel_id, get_road_by_source, Road};
 
 fn parse_channel_id(input: &str) -> Option<u64> {
     if let Ok(id) = input.parse::<u64>() {
@@ -28,12 +22,39 @@ fn parse_channel_id(input: &str) -> Option<u64> {
     None
 }
 
-#[poise::command(slash_command, guild_only)]
-pub async fn travel(
+#[poise::command(slash_command, guild_only, subcommands("stop", "start"), rename = "travel")]
+pub async fn travel(ctx: Context<'_>) -> Result<(), Error> {
+    Ok(())
+}
+
+#[poise::command(slash_command, guild_only, rename = "travel_start")]
+pub async fn start(
     ctx: Context<'_>,
+    #[description = "travel_start.destination"]
     destination: Option<String>,
 ) -> Result<(), Error> {
     let Ok(_) = ctx.defer_ephemeral().await else { return Err("reply__reply_failed".into()) };
+    
+    let server = match get_server_by_id(ctx.guild_id().unwrap().get()).await {
+        Ok(Some(s)) => s,
+        _ => return Err("travel__server_not_found".into()),
+    };
+
+    let _character = match server.clone().get_character_by_user_id(ctx.author().id.get()).await {
+        Ok(Some(c)) => c,
+        _ => return Err("travel__character_not_found".into()),
+    };
+
+    let player_move = match server.clone().get_player_move(ctx.author().id.get()).await {
+        Ok(Some(m)) => m,
+        _ => {return Err("travel__character_not_found".into())}
+    };
+
+    if player_move.is_in_move && player_move.actual_space_type == SpaceType::Road {
+        // Le joueur est sur une route, on l'arrête
+        let _ = stop_travel(ctx.author().id.get()).await;
+    }
+
     match destination {
         None => {travel_without_destination(ctx).await?}
         Some(dest) => {
@@ -45,6 +66,23 @@ pub async fn travel(
 
 
     Ok(())
+}
+
+#[poise::command(slash_command, guild_only, rename = "travel_stop")]
+pub async fn stop(ctx: Context<'_>) -> Result<(), Error> {
+    let Ok(_) = ctx.defer_ephemeral().await else { return Err("reply__reply_failed".into()) };
+    let user_id = ctx.author().id.get();
+    
+    match stop_travel(user_id).await {
+        Ok(_) => {
+            reply_with_args(ctx, Ok("travel__stopped"), None).await;
+            Ok(())
+        },
+        Err(_) => {
+            reply_with_args(ctx, Ok("travel__not_in_move"), None).await;
+            Ok(())
+        }
+    }
 }
 
 pub async fn _travel(ctx: Context<'_>, destination_input: String) -> Result<(), Error>{
@@ -74,26 +112,8 @@ pub async fn _travel(ctx: Context<'_>, destination_input: String) -> Result<(), 
 
     let mut player_move = match server.clone().get_player_move(ctx.author().id.get()).await {
         Ok(Some(m)) => m,
-        _ => {
-            // Initialise un nouveau PlayerMove si inexistant
-            PlayerMove {
-                universe_id: server.universe_id,
-                user_id: ctx.author().id.get(),
-                server_id: server.server_id,
-                actual_space_id: ctx.channel_id().get(),
-                actual_space_type: SpaceType::Place, // Par défaut, on suppose qu'il est dans un lieu
-                ..Default::default()
-            }
-        }
+        _ => {return Err("travel__character_not_found".into())}
     };
-
-    // On s'assure que le mouvement est bien dans l'univers actuel
-    if player_move.universe_id != server.universe_id {
-        // Le joueur change d'univers (rare mais possible via admin)
-        // On supprime l'ancien mouvement dans l'autre univers
-        let _ = player_move.remove().await;
-        player_move.universe_id = server.universe_id;
-    }
 
     match player_move.actual_space_type {
         SpaceType::Road => {
@@ -111,10 +131,13 @@ pub async fn _travel(ctx: Context<'_>, destination_input: String) -> Result<(), 
 
 async fn move_from_road(_ctx: &SerenityContext, destination_id: u64, server: Server, mut player_move: PlayerMove) -> Result<&'static str, Error>{
     let dest_id = destination_id;
+    let Some(road) = get_road_by_channel_id(server.universe_id, player_move.road_id.unwrap()).await?
+            else {return Err("move_from_place__road_not_found".into())};
     
     // Si on est sur une route, on ne peut aller que vers les extrémités (source ou destination originelle)
     if Some(dest_id) == player_move.destination_id {
         // Déjà en train d'y aller ? On ne fait rien ou on confirme
+        add_travel(_ctx.http.clone(), server.server_id.into(), player_move.clone()).await?;
         return Ok("travel__already_moving_to_destination");
     } else if Some(dest_id) == player_move.source_id {
         // Demi-tour
@@ -132,13 +155,16 @@ async fn move_from_road(_ctx: &SerenityContext, destination_id: u64, server: Ser
         
         // On recalcule la distance parcourue (on repart dans l'autre sens)
         // Pour simplifier, on inverse juste la progression
-        if let Ok(Some(road)) = crate::database::road::get_road_by_channel_id(server.universe_id, player_move.road_id.unwrap()).await {
+        if let Ok(Some(road)) = get_road_by_channel_id(server.universe_id, player_move.road_id.unwrap()).await {
             player_move.distance_traveled = (road.distance as f64 - player_move.distance_traveled).max(0.0);
         }
 
         add_travel(_ctx.http.clone(), server.server_id.into(), player_move.clone()).await?;
 
     } else {
+        println!("dest_id: {:?}", dest_id);
+        println!("player_move.destination_id: {:?}", player_move.destination_id);
+        println!("player_move.source_id: {:?}", player_move.source_id);
         return Err("travel__invalid_road_destination".into());
     }
     Ok("travel__started")
@@ -155,33 +181,56 @@ async fn travel_without_destination(ctx: Context<'_>) -> Result<(), Error>{
         }
     };
 
-    let available_roads: Vec<Road> = match get_road_by_source(
-        server.universe_id,
-        ctx.guild_channel().await.unwrap().parent_id.unwrap().get(),
-    )
-        .await
-    {
-        Ok(cursor) => {
-            let res = cursor.try_collect().await;
-            match res {
-                Ok(road) => {road}
-                Err(e) => {println!("{:?}", e); Vec::new()}
+    let Some(player_move) = server.clone().get_player_move(ctx.clone().author().id.get()).await? else {return Err("travel__character_not_found".into())};
+
+    let mut destinations = vec![];
+
+    match player_move.actual_space_type {
+        SpaceType::Road => {
+            let original_source = player_move.source_id.unwrap();
+            let original_destination = player_move.destination_id.unwrap();
+            let Some(road) = get_road(server.universe_id, original_source, original_destination).await? else {return Err("move_from_place__road_not_found".into())};
+            let Some(source_place) = get_place_by_category_id(road.universe_id, original_source).await? else{return Err("travel__source_place_not_found".into())};
+            let Some(destination_place) = get_place_by_category_id(road.universe_id, original_destination).await? else{return Err("travel__place_not_found".into())};
+
+
+            let distance_to_original_destination = road.distance as f64 - player_move.distance_traveled;
+            let distance_to_original_source = player_move.distance_traveled;
+
+            destinations.push(CreateSelectMenuOption::new( source_place.name + " • " + format!("{:.2}", distance_to_original_source).as_str() + "km", original_source.to_string()));
+            destinations.push(CreateSelectMenuOption::new( destination_place.name + " • " + format!("{:.2}", distance_to_original_destination).as_str() + "km", original_destination.to_string()));
+            //Les id sont bons ici
+
+        }
+        SpaceType::Place => {
+            let available_roads: Vec<Road> = match get_road_by_source(
+                server.universe_id,
+                ctx.guild_channel().await.unwrap().parent_id.unwrap().get(),
+            )
+                .await
+            {
+                Ok(cursor) => {
+                    let res = cursor.try_collect().await;
+                    match res {
+                        Ok(road) => {road}
+                        Err(e) => {println!("{:?}", e); Vec::new()}
+                    }
+
+                },
+                Err(_) => Vec::new(),
+            };
+
+            for road in available_roads {
+                let destination = if road.place_one_id == ctx.guild_channel().await.unwrap().parent_id.unwrap().get() {road.place_two_id}
+                else {road.place_one_id};
+                destinations.push(CreateSelectMenuOption::new(road.road_name + " • " + format!("{:.2}", road.distance).as_str() + "km", destination.to_string()));
             }
-
-        },
-        Err(_) => Vec::new(),
-    };
-
-    let mut roads = vec![];
-    for road in available_roads {
-        let destination = if road.place_one_id == ctx.guild_channel().await.unwrap().parent_id.unwrap().get() {road.place_two_id}
-            else {road.place_one_id};
-        roads.push(CreateSelectMenuOption::new(road.road_name + " • " + road.distance.to_string().as_str() + "km", destination.to_string()));
+        }
     }
 
     let select_menu = serenity::all::CreateSelectMenu::new("select__menu__chose_destination",
         serenity::all::CreateSelectMenuKind::String {
-            options: roads,
+            options: destinations,
         }
     );
 
@@ -228,30 +277,12 @@ pub async fn travel_from_handler(ctx: SerenityContext, interaction: ComponentInt
 
     let mut player_move = match server.clone().get_player_move(interaction.user.id.get()).await {
         Ok(Some(m)) => m,
-        _ => {
-            // Initialise un nouveau PlayerMove si inexistant
-            PlayerMove {
-                universe_id: server.universe_id,
-                user_id: interaction.user.id.get(),
-                server_id: server.server_id,
-                actual_space_id: interaction.channel_id.get(),
-                actual_space_type: SpaceType::Place, // Par défaut, on suppose qu'il est dans un lieu
-                ..Default::default()
-            }
-        }
+        _ => {return Err("travel__character_not_found".into())}
     };
-
-    // On s'assure que le mouvement est bien dans l'univers actuel
-    if player_move.universe_id != server.universe_id {
-        // Le joueur change d'univers (rare mais possible via admin)
-        // On supprime l'ancien mouvement dans l'autre univers
-        let _ = player_move.remove().await;
-        player_move.universe_id = server.universe_id;
-    }
 
     match player_move.actual_space_type {
         SpaceType::Road => {
-            move_from_road(&ctx, interaction.channel_id.get(), server, player_move.clone()).await?;
+            move_from_road(&ctx, destination_category_id, server, player_move.clone()).await?;
         }
         SpaceType::Place => {
             move_from_place(&ctx, interaction.channel_id.get(), destination_input.parse().unwrap(), server, player_move.clone()).await?;

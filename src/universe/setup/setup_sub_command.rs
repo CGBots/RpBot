@@ -50,8 +50,12 @@ pub enum SetupType {
 ///
 /// # Usage
 /// This command is intended to be run by guild administrators to perform initial setup steps or configurations required for the bot's operation.
-#[poise::command(slash_command, required_permissions = "ADMINISTRATOR", guild_only)]
-pub async fn setup(ctx: Context<'_>, setup_type: SetupType) -> Result<(), Error> {
+#[poise::command(slash_command, required_permissions = "ADMINISTRATOR", guild_only, rename = "universe_setup")]
+pub async fn setup(
+    ctx: Context<'_>,
+    #[description = "universe_setup.setup_type"]
+    setup_type: SetupType
+) -> Result<(), Error> {
     let Ok(_) = ctx.defer().await else { return Err("reply__reply_failed".into()) };
     let result = _setup(&ctx, setup_type).await;
     let Ok(_) = reply(ctx, result).await else { return Err("reply__reply_failed".into()) };

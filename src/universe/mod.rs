@@ -36,7 +36,7 @@ use crate::universe::time_sub_command::time;
 /// ### Notes:
 /// - This command requires specifying one of the listed subcommands as it does not
 ///   have a default action.
-#[poise::command(slash_command, subcommands("create_universe", "add_server", "setup", "time"), subcommand_required)]
+#[poise::command(slash_command, subcommands("create_universe", "add_server", "setup", "time"), subcommand_required, rename = "universe")]
 pub async fn universe(_ctx: Context<'_>) -> Result<(), Error>{
     Ok(())
 }

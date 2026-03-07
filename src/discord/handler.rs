@@ -14,7 +14,7 @@ use crate::characters::create_character_sub_command::{accept_character, choose_c
 #[allow(unused_imports)]
 use crate::translation::{apply_translations, tr};
 use crate::tr_locale;
-use crate::travel::travel__sub_command::{_travel, travel_from_handler};
+use crate::travel::travel__sub_command::{travel_from_handler};
 use crate::database::server::get_server_by_id;
 use crate::database::travel::SpaceType;
 use crate::travel::logic::manage_roles;

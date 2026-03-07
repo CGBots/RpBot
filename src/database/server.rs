@@ -1,15 +1,13 @@
-use futures::{StreamExt, TryStreamExt};
+use futures::{TryStreamExt};
 use std::cmp::PartialEq;
-use futures::stream::Collect;
 use log::{log, Level};
 use mongodb::bson::{doc, to_document};
 use mongodb::bson::oid::ObjectId;
-use mongodb::Cursor;
 use mongodb::results::{InsertOneResult, UpdateResult};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
-use crate::database::db_client::{DB_CLIENT, connect_db};
-use crate::database::db_namespace::{CHARACTERS_COLLECTION_NAME, VERSEENGINE_DB_NAME, SERVERS_COLLECTION_NAME, ROADS_COLLECTION_NAME, TRAVELS_COLLECTION_NAME};
+use crate::database::db_client::{connect_db, get_db_client};
+use crate::database::db_namespace::{VERSEENGINE_DB_NAME, SERVERS_COLLECTION_NAME, ROADS_COLLECTION_NAME, TRAVELS_COLLECTION_NAME};
 use crate::database::characters::Character;
 use crate::database::road::{get_road, Road};
 use crate::database::travel::PlayerMove;
@@ -219,7 +217,7 @@ impl Server {
     ///
     /// Returns a MongoDB error if the insert operation fails.
     pub async fn insert_server(&self) -> mongodb::error::Result<InsertOneResult> {
-        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+        let db_client = get_db_client().await;
         db_client
             .database(VERSEENGINE_DB_NAME)
             .collection::<Server>(SERVERS_COLLECTION_NAME)
@@ -240,7 +238,7 @@ impl Server {
         let filter = doc! {"_id": &self._id};
         let update = doc! {"$set": doc};
 
-        let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+        let db_client = get_db_client().await;
         db_client
             .database(VERSEENGINE_DB_NAME)
             .collection::<Server>(SERVERS_COLLECTION_NAME)
@@ -523,7 +521,7 @@ impl Server {
     }
 
     pub async fn get_player_move(self, user_id: u64) -> mongodb::error::Result<Option<PlayerMove>> {
-        let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }).await;
+        let db_client = get_db_client().await;
         let filter = doc!{"user_id": user_id.to_string().as_str(), "universe_id": self.universe_id};
         db_client
             .database(VERSEENGINE_DB_NAME)
@@ -533,7 +531,7 @@ impl Server {
     }
 
     pub async fn get_roads(self, place_id: u64) -> Result<Vec<Road>, mongodb::error::Error> {
-        let db_client = DB_CLIENT .get_or_init(|| async { connect_db().await.unwrap() }).await;
+        let db_client = get_db_client().await;
         let filter = doc!{
             "$or": [
                 doc!{"place_one_id": place_id.to_string(), "universe_id": self.universe_id},
@@ -561,7 +559,7 @@ impl Server {
 pub async fn get_server_by_id(
     server_id: u64,
 ) -> mongodb::error::Result<Option<Server>> {
-    let db_client = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await.clone();
+    let db_client = get_db_client().await;
     let filter = doc! {"server_id": server_id.to_string()};
     db_client
         .database(VERSEENGINE_DB_NAME)
@@ -585,7 +583,7 @@ mod test {
     }
 
     async fn insert_universe() -> Result<InsertOneResult, String> {
-        let _ = DB_CLIENT.get_or_init(|| async { connect_db().await.unwrap() }).await;
+        let _ = get_db_client().await;
         let universe = Universe {
             universe_id: *UNIVERSE_ID,
             name: "test".to_string(),

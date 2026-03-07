@@ -130,6 +130,10 @@ pub async fn constraint(){
         .await;
 }
 
+pub async fn get_db_client() -> mongodb::Client {
+    DB_CLIENT.get_or_init(|| async { connect_db().await.expect("Failed to connect to database") }).await.clone()
+}
+
 pub static DB_CLIENT: OnceCell<mongodb::Client> = OnceCell::const_new();
 
 #[cfg(test)]

@@ -107,7 +107,7 @@ async fn verify_moderator_permission(
 /// Slash command to initiate the character creation process.
 ///
 /// It delegates to `_create_character` and sends the result back to the user using the `reply` utility.
-#[poise::command(slash_command, guild_only)]
+#[poise::command(slash_command, guild_only, rename = "character_create_character")]
 pub async fn create_character(
     ctx: Context<'_>
 ) -> Result<(), Error> {
@@ -683,7 +683,7 @@ pub async fn choose_character_place(ctx: SerenityContext, component_interaction:
         _ => return Err("create_character__invalid_interaction".into()),
     };
 
-    let db_client = crate::database::db_client::DB_CLIENT.get_or_init(|| async { crate::database::db_client::connect_db().await.unwrap() }).await.clone();
+    let db_client = crate::database::db_client::get_db_client().await;
     let filter = mongodb::bson::doc!{"category_id": selected_category_id.get().to_string()};
     let place: Option<Place> = db_client
         .database(VERSEENGINE_DB_NAME)
