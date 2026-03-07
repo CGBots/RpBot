@@ -123,7 +123,7 @@ pub async fn constraint(){
         .keys(index_keys)
         .options(index_options)
         .build();
-    let result_server_index = db_client
+    let _ = db_client
         .database(VERSEENGINE_DB_NAME)
         .collection::<Server>(SERVERS_COLLECTION_NAME)
         .create_index(index_model)

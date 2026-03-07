@@ -487,9 +487,13 @@ move_from_place__road_not_found = Aucune route trouvée
 travel__moving_to_place = `{$user} se déplace vers {$destination}.`
 travel__reached_destination = `{$user} est arrivé à {$destination}.`
 travel__arrived_at_destination = `{$user} vient d'arriver.`
+travel__taking_unknown_road = `{$user} emprunte une route inconnue.`
 travel__invitation = Frontière atteinte
     .title = Frontière atteinte
     .message = **_{$user}, tu arrive à la frontière d'une région de l'univers {$universe} ! Voici l'invitation pour continuer ton voyage : {$link} _**
+travel__no_road_available = Aucune route disponible
+    .title = Aucune route disponible
+    .message = Aucune route ne semble disponible depuis cet endroit. Peut-être qu'une route secrète existe ?
 
 # Temps Universel
 time = temps

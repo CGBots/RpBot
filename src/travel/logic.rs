@@ -799,6 +799,13 @@ pub async fn add_travel(http: Arc<Http>, guild_id: u64, mut player_move: PlayerM
                 let user_display_name = character_name;
 
                 let mut destination_name = String::new();
+                let mut is_secret = false;
+                if let Some(rid) = first_step.road_id {
+                    if let Ok(Some(road)) = crate::database::road::get_road_by_channel_id(universe_id, rid).await {
+                        is_secret = road.secret;
+                    }
+                }
+
                 if let Some(did) = dest_id {
                     if let Ok(Some(place)) = crate::database::places::get_place_by_category_id(universe_id, did).await {
                         destination_name = place.name;
@@ -817,7 +824,12 @@ pub async fn add_travel(http: Arc<Http>, guild_id: u64, mut player_move: PlayerM
                             .or_else(|| channels.iter().find(|c| c.is_text_based() && c.kind != serenity::all::ChannelType::Voice && c.kind != serenity::all::ChannelType::Stage));
 
                         if let Some(target_channel) = target_channel {
-                            let _ = target_channel.id.send_message(&http_clone, CreateMessage::new().content(msg)).await;
+                            let departure_msg = if is_secret {
+                                tr_locale!("fr", "travel__taking_unknown_road", user: user_display_name.as_str())
+                            } else {
+                                msg
+                            };
+                            let _ = target_channel.id.send_message(&http_clone, CreateMessage::new().content(departure_msg)).await;
                         }
                     }
                 }
@@ -849,7 +861,7 @@ pub fn calculate_current_distance(player_move: &PlayerMove) -> f64 {
 }
 
 pub async fn stop_travel(user_id: u64) -> Result<PlayerMove, anyhow::Error> {
-    let mut moves_lock = MOVES.lock().await;
+    let moves_lock = MOVES.lock().await;
     let index = moves_lock.iter().position(|m| m.user_id == user_id);
     
     let mut player_move = if let Some(idx) = index {

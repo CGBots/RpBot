@@ -1,5 +1,5 @@
 use poise::serenity_prelude::Context as SerenityContext;
-use serenity::all::{CreateActionRow, EditMessage, Color, CreateSelectMenuOption, ComponentInteraction, Interaction};
+use serenity::all::{CreateActionRow, CreateSelectMenuOption, ComponentInteraction};
 use crate::database::places::{get_place_by_category_id,};
 use crate::database::server::{get_server_by_id, Server};
 use crate::database::travel::{PlayerMove, SpaceType};
@@ -9,6 +9,7 @@ use crate::utility::reply::{reply, reply_with_args};
 use futures::{TryStreamExt};
 use poise::{CreateReply};
 use crate::database::road::{get_road, get_road_by_channel_id, get_road_by_source, Road};
+use crate::roads::road;
 
 fn parse_channel_id(input: &str) -> Option<u64> {
     if let Ok(id) = input.parse::<u64>() {
@@ -75,11 +76,11 @@ pub async fn stop(ctx: Context<'_>) -> Result<(), Error> {
     
     match stop_travel(user_id).await {
         Ok(_) => {
-            reply_with_args(ctx, Ok("travel__stopped"), None).await;
+            let _ = reply_with_args(ctx, Ok("travel__stopped"), None).await;
             Ok(())
         },
         Err(_) => {
-            reply_with_args(ctx, Ok("travel__not_in_move"), None).await;
+            let _ = reply_with_args(ctx, Ok("travel__not_in_move"), None).await;
             Ok(())
         }
     }
@@ -110,7 +111,7 @@ pub async fn _travel(ctx: Context<'_>, destination_input: String) -> Result<(), 
         _ => return Err("travel__character_not_found".into()),
     };
 
-    let mut player_move = match server.clone().get_player_move(ctx.author().id.get()).await {
+    let player_move = match server.clone().get_player_move(ctx.author().id.get()).await {
         Ok(Some(m)) => m,
         _ => {return Err("travel__character_not_found".into())}
     };
@@ -131,8 +132,6 @@ pub async fn _travel(ctx: Context<'_>, destination_input: String) -> Result<(), 
 
 async fn move_from_road(_ctx: &SerenityContext, destination_id: u64, server: Server, mut player_move: PlayerMove) -> Result<&'static str, Error>{
     let dest_id = destination_id;
-    let Some(road) = get_road_by_channel_id(server.universe_id, player_move.road_id.unwrap()).await?
-            else {return Err("move_from_place__road_not_found".into())};
     
     // Si on est sur une route, on ne peut aller que vers les extrémités (source ou destination originelle)
     if Some(dest_id) == player_move.destination_id {
@@ -220,6 +219,11 @@ async fn travel_without_destination(ctx: Context<'_>) -> Result<(), Error>{
                 Err(_) => Vec::new(),
             };
 
+            if available_roads.is_empty(){
+                reply(ctx, Err("travel__no_road_available".into())).await;
+                return Ok(());
+            }
+
             for road in available_roads {
                 let destination = if road.place_one_id == ctx.guild_channel().await.unwrap().parent_id.unwrap().get() {road.place_two_id}
                 else {road.place_one_id};
@@ -264,8 +268,8 @@ pub async fn travel_from_handler(ctx: SerenityContext, interaction: ComponentInt
 
     let destination_category_id = parse_channel_id(&destination_input).ok_or_else(|| Error::from("travel__place_not_found"))?;
 
-    let destination_place = match get_place_by_category_id(server.universe_id, destination_category_id).await {
-        Ok(Some(p)) => p,
+    let _ = match get_place_by_category_id(server.universe_id, destination_category_id).await {
+        Ok(Some(_)) => {},
         _ => return Err("travel__place_not_found".into()),
     };
 
@@ -275,7 +279,7 @@ pub async fn travel_from_handler(ctx: SerenityContext, interaction: ComponentInt
         _ => return Err("travel__character_not_found".into()),
     };
 
-    let mut player_move = match server.clone().get_player_move(interaction.user.id.get()).await {
+    let player_move = match server.clone().get_player_move(interaction.user.id.get()).await {
         Ok(Some(m)) => m,
         _ => {return Err("travel__character_not_found".into())}
     };

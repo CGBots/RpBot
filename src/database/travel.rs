@@ -5,7 +5,7 @@ use mongodb::results::{DeleteResult, InsertOneResult, UpdateResult};
 use serde::{Deserialize, Serialize};
 use serde_with::DisplayFromStr;
 use serde_with::serde_as;
-use crate::database::db_client::{DB_CLIENT, get_db_client};
+use crate::database::db_client::{get_db_client};
 use crate::database::db_namespace::{TRAVELS_COLLECTION_NAME, VERSEENGINE_DB_NAME};
 use crate::database::modifiers::Modifier;
 use crate::database::stats::{get_stat_by_name, StatValue, SPEED_STAT};

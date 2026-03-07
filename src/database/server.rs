@@ -6,7 +6,7 @@ use mongodb::bson::oid::ObjectId;
 use mongodb::results::{InsertOneResult, UpdateResult};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
-use crate::database::db_client::{connect_db, get_db_client};
+use crate::database::db_client::{get_db_client};
 use crate::database::db_namespace::{VERSEENGINE_DB_NAME, SERVERS_COLLECTION_NAME, ROADS_COLLECTION_NAME, TRAVELS_COLLECTION_NAME};
 use crate::database::characters::Character;
 use crate::database::road::{get_road, Road};

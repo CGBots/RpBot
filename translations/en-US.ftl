@@ -481,10 +481,14 @@ travel__invalid_road_destination = Invalid destination
 move_from_place__road_not_found = No road found
     .title = No road found
     .message = There is no direct road between your current position and {$destination}.
+travel__no_road_available = No available roads
+    .title = No available road
+    .message = No available road seems to be accessible from here. Maybe a secret road exists ?
 
 travel__moving_to_place = `{$user} is moving toward {$destination}.`
 travel__reached_destination = `{$user} has reached {$destination}.`
 travel__arrived_at_destination = `{$user} has just arrived.`
+travel__taking_unknown_road = `{$user} is taking an unknown road.`
 travel__invitation = Border reached
     .title = Border reached
     .message = **_{$user}, you have reached the border of a region in the universe {$universe}! Here is the invitation to continue your journey: {$link} _**

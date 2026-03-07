@@ -65,7 +65,6 @@ pub async fn setup_universal_time() {
         if modifier <= 0.0 { continue; }
 
         let phase_duration_secs = (21600.0 / modifier) as u64;
-        let cycle_duration_secs = phase_duration_secs * 4;
         let origin_secs = (universe.time_origin_timestamp / 1000) as u64;
 
         // Calculer la phase actuelle
