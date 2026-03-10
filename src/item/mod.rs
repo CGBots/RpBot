@@ -10,7 +10,7 @@ use serde_with::serde_as;
 pub enum ItemUsage{
     Consumable, //Peut être consommée => Usage unique
     Usable, //Peut être utilisé => Usage multiple
-    Disposable, //Peut être placé => Outils utilisables liés à un lieu => Usage Unique
+    Placeable, //Peut être placé => Outils utilisables liés à un lieu => Usage Unique
     Wearable, //Peut être équipé => Usage "multiples"
     None //Pas d'usage => Pour des items purement décoratif ou de lore
 }

@@ -1,7 +1,7 @@
 use futures::TryStreamExt;
 use crate::database::items::Item;
 use poise::{ChoiceParameter, CreateReply};
-use serenity::all::{Attachment, CreateEmbed, CreateForumPost, CreateForumTag, CreateMessage};
+use serenity::all::{Attachment, Colour, CreateEmbed, CreateForumPost, CreateForumTag, CreateMessage};
 use crate::database::server::{get_server_by_id, Server};
 use crate::database::stats::Stat;
 use crate::discord::channels::{ITEM_TAG, PLACE_TAG};
@@ -15,23 +15,41 @@ pub async fn create(
     ctx: Context<'_>,
     name: String,
     usage: ItemUsage,
+    into_wiki: bool,
     image: Option<Attachment>,
     description: Option<String>,
-    into_wiki: bool,
+    secret_informations: Option<String>,
 ) -> Result<(), Error> {
     let url = match image{
-        None => {"".into()}
-        Some(image) => {image.url}
+        None => {None}
+        Some(image) => {Some(image.url)}
     };
-    let description = description.clone().unwrap_or("".to_string());
 
     let Some(server) = get_server_by_id(ctx.guild_id().unwrap().get()).await? else {return Err("item__server_not_found".into())};
 
+    let result = Item{
+        _id: Default::default(),
+        universe_id: server.universe_id,
+        item_name: name.clone(),
+        item_usage: usage.clone(),
+        effects: vec![],
+        description: description.clone(),
+        image: url.clone(),
+        wiki_post_id: None,
+        secret_informations: secret_informations
+    }.save().await;
+
+    match result{
+        Ok(_) => {}
+        Err(_) => { let _ = reply(ctx, Err("create_item__db_error".into())).await; return Ok(()) }
+    }
+
     let embed = CreateEmbed::new()
         .title(name.clone())
-        .description(description.clone())
-        .field(tr!(ctx.clone(), "item_usage_title"), usage.name(), true)
-        .thumbnail(url.clone());
+        .description(description.clone().unwrap_or("".to_string()))
+        .field(tr!(ctx.clone(), "item_usage_title"), tr!(ctx.clone(), usage.name()), true)
+        .colour(Colour::from_rgb(25, 125, 255))
+        .thumbnail(url.clone().unwrap_or("".to_string()));
 
     if into_wiki {
         let Ok(servers_cursor) = server.get_other_servers().await else {return Err("item_db_error".into())};
@@ -47,25 +65,6 @@ pub async fn create(
         }
     };
 
-    let result = Item{
-        _id: Default::default(),
-        universe_id: server.universe_id,
-        item_name: name.clone(),
-        item_usage: usage.clone(),
-        effects: vec![],
-        description: description.clone(),
-        image: url.clone(),
-        wiki_post_id: None,
-    }.save().await;
-
-    match result{
-        Ok(_) => {}
-        Err(_) => { let _ = reply(ctx, Err("create_item__db_error".into())).await; return Ok(()) }
-    }
-
-
-
     ctx.send(CreateReply::default().embed(embed)).await?;
-
     Ok(())
 }

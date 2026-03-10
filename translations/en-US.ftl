@@ -126,8 +126,8 @@ id__channel_delete_failed = Failed to delete channel
 
 #Setup
 SetupType = SetupType
-    .FullSetup = Full
-    .PartialSetup = Partial
+FullSetup = Full
+PartialSetup = Partial
 cancel_setup = Cancel
 continue_setup = Continue 
 setup__continue_setup_message = Continue setup?
@@ -509,3 +509,12 @@ time__midnight = **_It is midnight. Silence falls upon the universe._**
 time__sunrise = **_The sun rises, a new day begins._**
 time__noon = **_It is noon. The sun is at its zenith._**
 time__sunset = **_The sun sets, the shadows grow longer._**
+
+#Create Item
+item_usage_title = Usage type
+ItemUsage = ItemUsage
+Consumable = Consumable
+Usable = Usable
+Wearable = Wearable
+Placeable = Placeable
+None = Other

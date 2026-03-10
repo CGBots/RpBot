@@ -126,8 +126,8 @@ id__channel_delete_failed = Échec de la suppression du salon
 
 #Setup
 SetupType = SetupType
-    .FullSetup = Complet
-    .PartialSetup = Partiel
+FullSetup = Complet
+PartialSetup = Partiel
 cancel_setup = Annuler
 continue_setup = Continuer 
 setup__continue_setup_message = Continuer la configuration ?
@@ -510,3 +510,12 @@ time__midnight = **_Il est minuit. Le silence s'abat sur l'univers._**
 time__sunrise = **_Le soleil se lève, une nouvelle journée commence._**
 time__noon = **_Il est midi. Le soleil est au zénith._**
 time__sunset = **_Le soleil se couche, les ombres s'allongent._**
+
+#Create Item
+item_usage_title = Type d'usage
+ItemUsage = ItemUsage
+Consumable = Consommable
+Usable = Utilisable
+Wearable = Equipable
+Placeable = Plaçable
+None = Autre

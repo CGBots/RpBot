@@ -16,8 +16,9 @@ pub struct Item {
     pub item_name: String,
     pub item_usage: ItemUsage,
     pub effects: Vec<Modifier>,
-    pub description: String,
-    pub image: String,
+    pub description: Option<String>,
+    pub secret_informations: Option<String>, //Only displayed when player got the item and look the item sheet
+    pub image: Option<String>,
     pub wiki_post_id: Option<ObjectId>,
 }
 
