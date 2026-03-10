@@ -76,6 +76,8 @@ place_create_place = nouvel_endroit
     .description = Crée une nouvelle catégorie correspondant à une ville ou un lieu d'interaction.
     .name = nom
     .name-description = Nom du lieu à créer.
+create_place__new_place_title = Lieu: {$place_name}
+create_place__channel_id = Id du lieu
 
 #Characters
 character = personnage

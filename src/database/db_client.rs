@@ -5,7 +5,8 @@ use mongodb::IndexModel;
 use mongodb::options::IndexOptions;
 use tokio::sync::OnceCell;
 use urlencoding::encode;
-use crate::database::db_namespace::{VERSEENGINE_DB_NAME, SERVERS_COLLECTION_NAME};
+use crate::database::db_namespace::{VERSEENGINE_DB_NAME, SERVERS_COLLECTION_NAME, ITEM_COLLECTION_NAME};
+use crate::database::items::Item;
 use crate::database::server::Server;
 
 /// Establishes an asynchronous connection to a MongoDB database.
@@ -126,6 +127,24 @@ pub async fn constraint(){
     let _ = db_client
         .database(VERSEENGINE_DB_NAME)
         .collection::<Server>(SERVERS_COLLECTION_NAME)
+        .create_index(index_model)
+        .await;
+
+
+    let index_keys = doc! {
+        "universe_id": 1,
+        "item_name": 1,
+    };
+    let index_options = IndexOptions::builder()
+        .unique(true)
+        .build();
+    let index_model = IndexModel::builder()
+        .keys(index_keys)
+        .options(index_options)
+        .build();
+    let _ = db_client
+        .database(VERSEENGINE_DB_NAME)
+        .collection::<Item>(ITEM_COLLECTION_NAME)
         .create_index(index_model)
         .await;
 }

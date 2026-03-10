@@ -6,3 +6,4 @@ pub static STATS_COLLECTION_NAME: &str = "stats";
 pub static ROADS_COLLECTION_NAME: &str = "roads";
 pub static CHARACTERS_COLLECTION_NAME: &str = "characters";
 pub static TRAVELS_COLLECTION_NAME: &str = "travels";
+pub static ITEM_COLLECTION_NAME: &str = "items";

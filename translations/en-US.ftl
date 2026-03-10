@@ -76,6 +76,8 @@ place_create_place = new_place
     .description = Creates a new category corresponding to a city or interaction place.
     .name = name
     .name-description = Name of the place to create.
+create_place__new_place_title = Place: {$place_name}
+create_place__channel_id = Place Id
 
 #Characters
 character = character
@@ -209,6 +211,7 @@ setup__universal_time_channel_not_created = Universal time channel not created
     .message = Unable to create the universal time channel
             Please try again or contact support if the problem persists: {support}
 rp_wiki_channel_name = Wiki
+
 setup__wiki_channel_not_created = Wiki channel not created
     .title = Creation error
     .message = Unable to create the wiki channel

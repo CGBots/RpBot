@@ -7,9 +7,9 @@ use std::time::Duration;
 #[allow(unused_imports)]
 use std::sync::{Arc, Mutex};
 use std::{env};
-use serenity::all::GatewayIntents;
+use poise::serenity_prelude::ClientBuilder;
 use serenity::Client;
-use serenity::client::ClientBuilder;
+use poise::serenity_prelude::GatewayIntents;
 use crate::{translation};
 use crate::characters::character;
 use crate::place::place;
@@ -18,6 +18,7 @@ use crate::discord::handler::Handler;
 use crate::ping_command::handler::ping;
 use crate::start_command::handler::start;
 use crate::discord::poise_structs::Data;
+use crate::item::item;
 use crate::tip::support_command::support_command;
 use crate::universe::universe;
 use crate::travel::travel__sub_command::travel;
@@ -89,7 +90,7 @@ pub async fn connect_bot() -> Result<Client, ()>{
     tracing_subscriber::fmt::init();
     
     
-    let mut commands= vec![ping(), universe(), start(), place(), road(), character(), travel(), support_command()];
+    let mut commands= vec![ping(), universe(), start(), place(), road(), character(), travel(), support_command(), item()];
     
     
     let translations = translation::read_ftl().expect("failed to read translation files");
