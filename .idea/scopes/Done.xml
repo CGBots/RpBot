@@ -1,3 +1,0 @@
-<component name="DependencyValidationManager">
-  <scope name="Done" pattern="file[RpBot]:src/create_universe_command/*||file[RpBot]:src/add_server_to_universe_command//*||file[RpBot]:src/add_server_to_universe_command/*" />
-</component>
