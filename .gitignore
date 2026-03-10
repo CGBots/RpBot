@@ -1,0 +1,5 @@
+/.env
+/target/
+/.output.txt
+/Cargo.lock
+/.cargo/
