@@ -592,6 +592,16 @@ impl Universe {
 
 }
 
+pub async fn get_servers_from_universe(universe_id: &ObjectId) -> mongodb::error::Result<Cursor<Server>> {
+    let db_client = get_db_client().await;
+    let filter = doc! { "universe_id": universe_id};
+    db_client
+        .database(VERSEENGINE_DB_NAME)
+        .collection::<Server>(SERVERS_COLLECTION_NAME)
+        .find(filter)
+        .await
+}
+
 /// Asynchronously retrieves a `Universe` document from the database by its unique identifier.
 ///
 /// # Arguments

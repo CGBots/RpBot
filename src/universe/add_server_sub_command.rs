@@ -4,10 +4,11 @@ use crate::discord::poise_structs::{Context, Error};
 use crate::tr;
 use crate::database::universe::{get_universe_by_id, get_universe_by_server_id, Universe};
 use poise::CreateReply;
+use poise::serenity_prelude::ComponentInteractionCollector;
 use serenity::all::CreateSelectMenu;
 use serenity::all::CreateSelectMenuKind;
 use serenity::all::CreateSelectMenuOption;
-use serenity::all::{ComponentInteractionCollector, ComponentInteractionDataKind, CreateActionRow};
+use serenity::all::{ComponentInteractionDataKind, CreateActionRow};
 use crate::database::server::Server;
 use crate::universe::setup::setup_sub_command::{SetupType, _setup};
 use crate::utility::reply::reply;
@@ -59,7 +60,7 @@ pub async fn _add_server(ctx: &Context<'_>, setup_type: SetupType) -> Result<&'s
 
     let serenity_context = ctx.serenity_context();
 
-    let result = while let Some(mci) = ComponentInteractionCollector::new(serenity_context)
+    while let Some(mci) = ComponentInteractionCollector::new(serenity_context)
         .timeout(std::time::Duration::from_secs(120))
         .filter(move |mci| mci.data.custom_id == "selected_universe")
         .await

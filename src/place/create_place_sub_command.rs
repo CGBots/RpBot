@@ -1,8 +1,11 @@
-use serenity::all::{CreateChannel, EditRole, PermissionOverwrite, PermissionOverwriteType, Permissions, RoleId};
+use futures::TryStreamExt;
+use serenity::all::{CreateChannel, CreateEmbed, CreateForumPost, CreateMessage, EditRole, PermissionOverwrite, PermissionOverwriteType, Permissions, RoleId};
 use serenity::all::ChannelType::Category;
 use crate::database::places::Place;
-use crate::database::server::{get_server_by_id};
+use crate::database::server::{get_server_by_id, Server};
+use crate::discord::channels::PLACE_TAG;
 use crate::discord::poise_structs::{Context, Error};
+use crate::tr;
 use crate::utility::reply::reply;
 
 #[poise::command(slash_command, required_permissions= "ADMINISTRATOR", guild_only, rename = "place_create_place")]
@@ -104,6 +107,25 @@ pub async fn _create_place(ctx: &Context<'_>, name: String) -> Result<&'static s
             };
         }
     };
+
+    let embed = CreateEmbed::new()
+        .title(name.clone().to_string())
+        .field(tr!(ctx.clone(), "create_place__channel_id"), "`".to_string() + new_place.clone().id.get().to_string().as_str() + "`", true);
+
+    let Ok(servers_cursor) = server.get_other_servers().await else {return Err("create_place__servers_not_found".into())};
+    let Ok(servers) = servers_cursor.try_collect::<Vec<Server>>().await else {return Err("create_place__server_collect_failed".into())};
+    for server in servers {
+        if let Some(wiki_channel_id) = server.rp_wiki_channel_id{
+            let Ok(wiki_channel) = ctx.http().get_channel(wiki_channel_id.id.into()).await else {continue};
+            let channel = wiki_channel.guild().unwrap();
+            let place_tag = channel.available_tags.iter().find(|tag| tag.name == PLACE_TAG);
+            let mut post = CreateForumPost::new(tr!(ctx.clone(), "create_place__new_place_title", place_name: name.clone()).to_string(), CreateMessage::new().embed(embed.clone()));
+            if let Some(tag) = place_tag {
+                post = post.add_applied_tag(tag.id);
+            }
+            let _ = channel.create_forum_post(ctx, post).await;
+        }
+    }
 
     let place = Place{
         _id: Default::default(),

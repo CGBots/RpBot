@@ -1,6 +1,7 @@
 use crate::discord::lib_tuning::guildid::RolePositions;
 use lazy_static::lazy_static;
-use serenity::all::{Builder, EditRole, GuildId, Permissions, Role, RoleId};
+use poise::serenity_prelude::Builder;
+use serenity::all::{EditRole, GuildId, Permissions, Role, RoleId};
 use serenity::model::permissions::{PRESET_GENERAL};
 use crate::discord::poise_structs::Context;
 

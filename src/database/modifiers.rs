@@ -13,7 +13,6 @@ pub enum ModifierType{
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Modifier{
-    pub priority: i32,
     pub stat: ObjectId,
     pub value: StatValue,
     pub modifier_type: ModifierType,

@@ -3,6 +3,7 @@ use std::cmp::PartialEq;
 use log::{log, Level};
 use mongodb::bson::{doc, to_document};
 use mongodb::bson::oid::ObjectId;
+use mongodb::Cursor;
 use mongodb::results::{InsertOneResult, UpdateResult};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
@@ -11,6 +12,7 @@ use crate::database::db_namespace::{VERSEENGINE_DB_NAME, SERVERS_COLLECTION_NAME
 use crate::database::characters::Character;
 use crate::database::road::{get_road, Road};
 use crate::database::travel::PlayerMove;
+use crate::database::universe::get_servers_from_universe;
 use crate::discord::poise_structs::{Context, Error};
 
 /// Represents the type of a Discord identifier.
@@ -548,6 +550,10 @@ impl Server {
     
     pub async fn get_road(self, place_one: u64, place_two: u64) -> mongodb::error::Result<Option<Road>> {
         get_road(self.universe_id, place_one, place_two).await
+    }
+    
+    pub async fn get_other_servers(&self) -> mongodb::error::Result<Cursor<Server>> {
+        get_servers_from_universe(&self.universe_id).await
     }
 }
 

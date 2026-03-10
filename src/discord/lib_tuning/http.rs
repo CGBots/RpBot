@@ -1,5 +1,5 @@
+use poise::serenity_prelude::json::{to_vec, Value};
 use serenity::all::{GuildId, Http, LightMethod, Request, Role, Route};
-use serenity::json::{to_vec, Value};
 
 pub(crate) trait HttpRolePositions {
     async fn edit_guild_role_positions(

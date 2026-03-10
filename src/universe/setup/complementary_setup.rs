@@ -1,6 +1,6 @@
-use serenity::all::{ChannelType};
+use serenity::all::{ChannelType, CreateForumTag, EditChannel};
 use crate::database::server::{Id, IdType, Server};
-use crate::discord::channels::{create_channel, get_admin_category_permission_set, get_rp_character_permission_set, get_universal_time_permission_set};
+use crate::discord::channels::{create_channel, get_admin_category_permission_set, get_rp_character_permission_set, get_universal_time_permission_set, ITEM_TAG, PLACE_TAG, SPACE_TAG};
 use crate::discord::poise_structs::{Context, Error};
 use crate::tr;
 
@@ -262,12 +262,18 @@ pub async fn complementary_setup<'a>(ctx: &Context<'_>, server : &'a mut Server,
         }
     };
 
-
     let wiki_channel_result = match server.rp_wiki_channel_id{
         None => {
             let result = create_channel(ctx, tr!(*ctx, "rp_wiki_channel_name"), ChannelType::Forum, 0, vec![], Some(rp_category.clone().id.get())).await;
             match result {
-                Ok(channel) => { Ok(channel)}
+                Ok(channel) => {
+                    let _ = channel.clone().edit(ctx, EditChannel::new().available_tags(vec![
+                        CreateForumTag::new(PLACE_TAG),
+                        CreateForumTag::new(SPACE_TAG),
+                        CreateForumTag::new(ITEM_TAG),
+                    ])).await;
+                    Ok(channel)
+                }
                 Err(e) => {errors.push("setup__wiki_channel_not_created"); Err(e)}
             }
         }
